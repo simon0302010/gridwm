@@ -1,0 +1,10 @@
+[package]
+name = "gridwm"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+thiserror = "2.0.17"
+x11 = { version = "2.21.0", features = ["xlib"] }
+log = "0.4.*"
+simple_logger = "5.1.*"
