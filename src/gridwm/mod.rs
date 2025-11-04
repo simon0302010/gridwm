@@ -1,9 +1,14 @@
 use log::*;
 use std::{
+    collections::BTreeSet,
     ffi::{CString, NulError},
     mem::zeroed,
+    slice,
 };
-use x11::xlib;
+use x11::{
+    xinerama,
+    xlib::{self, XWindowAttributes},
+};
 
 use thiserror::Error;
 
@@ -14,11 +19,17 @@ pub enum GridWMError {
 
     #[error("{0}")]
     NulString(#[from] NulError),
+
+    #[error("screen {0} not found")]
+    ScreenNotFound(String),
 }
 
 pub struct GridWM {
     display: *mut xlib::Display,
+    windows: BTreeSet<Window>,
 }
+
+pub type Window = u64;
 
 impl GridWM {
     pub fn new(display_name: &str) -> Result<Self, GridWMError> {
@@ -36,7 +47,9 @@ impl GridWM {
             return Err(GridWMError::DisplayNotFound(display_name.into()));
         }
 
-        Ok(GridWM { display })
+        let windows: BTreeSet<u64> = BTreeSet::new();
+
+        Ok(GridWM { display, windows })
     }
 
     pub fn init(&self) -> Result<(), GridWMError> {
@@ -44,13 +57,13 @@ impl GridWM {
             xlib::XSelectInput(
                 self.display,
                 xlib::XDefaultRootWindow(self.display),
-                xlib::SubstructureRedirectMask,
+                xlib::SubstructureRedirectMask | xlib::SubstructureNotifyMask,
             );
         }
         Ok(())
     }
 
-    pub fn run(&self) {
+    pub fn run(&mut self) {
         info!("gridwm running");
 
         let mut event: xlib::XEvent = unsafe { zeroed() };
@@ -62,17 +75,64 @@ impl GridWM {
                     xlib::MapRequest => {
                         self.create_window(event);
                     }
+                    xlib::UnmapNotify => {
+                        self.remove_window(event);
+                    }
                     _ => {
-                        warn!("unknown event: {:?}", event);
+                        debug!("event triggered: {:?}", event);
                     }
                 }
             }
         }
     }
 
-    fn create_window(&self, event: xlib::XEvent) {
+    fn create_window(&mut self, event: xlib::XEvent) {
         info!("creating a window");
         let event: xlib::XMapRequestEvent = From::from(event);
         unsafe { xlib::XMapWindow(self.display, event.window) };
+        self.windows.insert(event.window);
+    }
+
+    fn remove_window(&mut self, event: xlib::XEvent) {
+        let event: xlib::XUnmapEvent = From::from(event);
+        match self.windows.remove(&event.window) {
+            true => {
+                info!("closed a window");
+            }
+            false => {
+                warn!("tried removing not existing window")
+            }
+        }
+    }
+
+    fn get_screen_size(&self) -> Result<(i16, i16), GridWMError> {
+        unsafe {
+            let mut num: i32 = 0;
+            let screen_pointers = xinerama::XineramaQueryScreens(self.display, &mut num);
+            let screens = slice::from_raw_parts(screen_pointers, num as usize).to_vec();
+            let screen = screens.get(0);
+
+            if let Some(screen) = screen {
+                Ok((screen.width, screen.width))
+            } else {
+                Err(GridWMError::ScreenNotFound("0".to_string()))
+            }
+        }
+    }
+
+    fn move_window(&self, window: Window, x: i32, y: i32) {
+        unsafe { xlib::XMoveWindow(self.display, window, x, y) };
+    }
+
+    fn resize_window(&self, window: Window, width: u32, height: u32) {
+        unsafe { xlib::XResizeWindow(self.display, window, width, height) };
+    }
+
+    fn get_window_attributes(&self, window: Window) -> XWindowAttributes {
+        let mut attrs: XWindowAttributes = unsafe { zeroed() };
+        unsafe {
+            xlib::XGetWindowAttributes(self.display, window, &mut attrs);
+        }
+        attrs
     }
 }

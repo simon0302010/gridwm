@@ -7,7 +7,7 @@ use gridwm::GridWM;
 fn main() -> Result<(), Box<dyn Error>> {
     let display_name = std::env::var("DISPLAY")?;
 
-    let wm = GridWM::new(&display_name)?;
+    let mut wm = GridWM::new(&display_name)?;
 
     wm.init()?;
     wm.run();
