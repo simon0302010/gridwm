@@ -3,11 +3,13 @@ use std::{
     collections::BTreeSet,
     ffi::{CString, NulError},
     mem::zeroed,
+    os::unix::process::CommandExt,
+    process::Command,
     slice,
 };
 use x11::{
     xinerama,
-    xlib::{self, XWindowAttributes, XkbEvent},
+    xlib::{self, XButtonPressedEvent, XWindowAttributes, XkbEvent},
 };
 
 use thiserror::Error;
@@ -84,7 +86,10 @@ impl GridWM {
                         self.remove_window(event);
                     }
                     xlib::KeyPress => {
-                        self.handle_click(event);
+                        self.handle_key(event);
+                    }
+                    xlib::ButtonPress => {
+                        self.handle_button(event);
                     }
                     _ => {
                         debug!("event triggered: {:?}", event);
@@ -146,16 +151,30 @@ impl GridWM {
         attrs
     }
 
-    fn handle_click(&self, event: xlib::XEvent) {
+    fn handle_key(&self, event: xlib::XEvent) {
         let event: xlib::XKeyPressedEvent = From::from(event);
 
         let keysym = unsafe { xlib::XKeycodeToKeysym(self.display, event.keycode as u8, 0) as u32 };
 
         match keysym {
             x11::keysym::XK_space => {
-                debug!("Space pressed.");
+                Command::new("konsole").exec();
             }
             _ => {}
+        }
+    }
+
+    fn handle_button(&self, event: xlib::XEvent) {
+        let event: XButtonPressedEvent = From::from(event);
+        if event.subwindow != 0 {
+            unsafe {
+                xlib::XSetInputFocus(
+                    self.display,
+                    event.subwindow,
+                    xlib::RevertToParent,
+                    xlib::CurrentTime,
+                );
+            }
         }
     }
 
