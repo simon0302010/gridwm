@@ -1,4 +1,6 @@
+mod config;
 mod error;
+use config::*;
 use error::*;
 
 use log::*;
@@ -6,12 +8,11 @@ use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, sl
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, XButtonPressedEvent, XCreateFontCursor, XDefaultRootWindow, XFlush,
-        XWindowAttributes,
+        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor,
+        XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor,
+        XSetWindowBackground, XWindowAttributes,
     },
 };
-
-use configparser::ini::Ini;
 
 pub struct GridWM {
     display: *mut xlib::Display,
@@ -43,89 +44,29 @@ impl GridWM {
         }
 
         // load config
-        let mut config = Ini::new();
-        match config.load("gridwm.conf") {
-            Ok(_) => {
-                info!("loaded configuration file");
-            }
-            Err(e) => return Err(GridWMError::ConfigLoadFailed(e)),
-        }
+        let config = Config::from_file("gridwm.toml")?;
 
         // set keyboard layout
-        if let Some(layout) = config.get("keyboard", "layout") {
-            match Command::new("setxkbmap").arg(layout).spawn() {
-                Ok(_) => {}
-                Err(e) => {
-                    error!("failed to set keyboard layout: {}", e);
-                }
+        match Command::new("setxkbmap")
+            .arg(config.keyboard.layout)
+            .spawn()
+        {
+            Ok(_) => {}
+            Err(e) => {
+                error!("failed to set keyboard layout: {}", e);
             }
         }
 
         let cursor: Cursor = unsafe { XCreateFontCursor(self.display, 68) };
 
-        let do_accel = match config.getbool("mouse", "use_acceleration") {
-            Ok(accel) => {
-                if let Some(value) = accel {
-                    value as i32
-                } else {
-                    0
+        let (accel_numerator, accel_denominator) =
+            match config.mouse.acceleration_value.as_fraction() {
+                Some((a, b)) => (a, b),
+                None => {
+                    warn!("failed to get mouse acceleration. falling back to default.");
+                    (1, 1)
                 }
-            }
-            Err(e) => {
-                error!("failed to get mouse acceleration: {}", e);
-                0
-            }
-        };
-        let do_threshold = match config.getbool("mouse", "use_acceleration_threshold") {
-            Ok(thres) => {
-                if let Some(value) = thres {
-                    value as i32
-                } else {
-                    0
-                }
-            }
-            Err(e) => {
-                error!("failed to get mouse acceleration threshold: {}", e);
-                0
-            }
-        };
-        let (accel_numerator, accel_denominator) = match config.get("mouse", "acceleration_value") {
-            Some(accel) => {
-                let mut split_accel = accel.split("/");
-
-                let first_str = split_accel.next().unwrap();
-                let second_str = split_accel.next().unwrap();
-
-                let first = first_str.parse::<i32>();
-                let second = second_str.parse::<i32>();
-
-                match (first, second) {
-                    (Ok(a), Ok(b)) => (a, b),
-                    _ => {
-                        error!("one of the values is not a valid integer");
-                        (1, 1)
-                    }
-                }
-            }
-            None => {
-                error!("failed to get mouse acceleration value");
-                (1, 1)
-            }
-        };
-        let threshold = match config.get("mouse", "acceleration_threshold") {
-            Some(thres) => {
-                let threshold = thres.parse::<i32>();
-
-                match threshold {
-                    Ok(threshold) => threshold,
-                    _ => 0,
-                }
-            }
-            None => {
-                error!("failed to get acceleration threshold");
-                0
-            }
-        };
+            };
 
         unsafe {
             xlib::XSelectInput(
@@ -141,15 +82,19 @@ impl GridWM {
 
             xlib::XChangePointerControl(
                 self.display,
-                do_accel,
-                do_threshold,
+                config.mouse.use_acceleration as i32,
+                config.mouse.use_acceleration_threshold as i32,
                 accel_numerator,
                 accel_denominator,
-                threshold,
+                config.mouse.acceleration_threshold,
             );
 
             xlib::XDefineCursor(self.display, XDefaultRootWindow(self.display), cursor);
 
+            // set background yay
+            self.set_background(config.desktop.color);
+
+            // flush the toilet
             XFlush(self.display);
         }
         Ok(())
@@ -253,7 +198,11 @@ impl GridWM {
 
     fn handle_button(&self, event: xlib::XEvent) {
         let event: XButtonPressedEvent = From::from(event);
-        let target = if event.subwindow != 0 {event.subwindow} else {event.window};
+        let target = if event.subwindow != 0 {
+            event.subwindow
+        } else {
+            event.window
+        };
         if event.subwindow != 0 {
             unsafe {
                 xlib::XSetInputFocus(
@@ -282,5 +231,42 @@ impl GridWM {
                 current_x += window_width as i32;
             }
         }
+    }
+
+    fn set_background(&self, hex: String) {
+        let root_window = unsafe { XDefaultRootWindow(self.display) };
+        unsafe {
+            let screen = XDefaultScreen(self.display);
+
+            let mut color: XColor = std::mem::zeroed();
+
+            let hex_str = match CString::new(hex) {
+                Ok(hex_str) => hex_str,
+                Err(e) => {
+                    error!("failed to convert background color str to cstring: {}", e);
+                    return;
+                }
+            };
+
+            if XParseColor(
+                self.display,
+                XDefaultColormap(self.display, screen),
+                hex_str.as_ptr(),
+                &mut color,
+            ) != 1
+            {
+                error!("failed to parse background color");
+            }
+
+            XAllocColor(
+                self.display,
+                XDefaultColormap(self.display, screen),
+                &mut color,
+            );
+
+            XSetWindowBackground(self.display, root_window, color.pixel);
+
+            XClearWindow(self.display, root_window);
+        };
     }
 }
