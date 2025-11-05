@@ -40,6 +40,7 @@ dependencies = [
  "num-rational",
  "num-traits",
  "serde",
+ "shell-words",
  "simple_logger",
  "toml",
  "x11",
@@ -201,6 +202,12 @@ checksum = "e24345aa0fe688594e73770a5f6d1b216508b4f93484c0026d521acd30134392"
 dependencies = [
  "serde_core",
 ]
+
+[[package]]
+name = "shell-words"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24188a676b6ae68c3b2cb3a01be17fbf7240ce009799bb56d5b1409051e78fde"
 
 [[package]]
 name = "simple_logger"

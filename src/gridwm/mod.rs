@@ -1,6 +1,6 @@
 mod config;
 mod error;
-use config::*;
+use config::Config;
 use error::*;
 
 use log::*;
@@ -8,15 +8,14 @@ use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, sl
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor,
-        XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor,
-        XSetWindowBackground, XWindowAttributes,
+        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor, XQueryTree, XSetWindowBackground, XWindowAttributes
     },
 };
 
 pub struct GridWM {
     display: *mut xlib::Display,
     windows: BTreeSet<Window>,
+    config: Config
 }
 
 pub type Window = u64;
@@ -30,9 +29,13 @@ impl GridWM {
             return Err(GridWMError::DisplayNotFound(display_name.into()));
         }
 
+        // create set to store windows
         let windows: BTreeSet<u64> = BTreeSet::new();
 
-        Ok(GridWM { display, windows })
+        // load config
+        let config = Config::from_file("gridwm.toml")?; // load config here
+
+        Ok(GridWM { display, windows, config })
     }
 
     pub fn init(&self) -> Result<(), GridWMError> {
@@ -43,12 +46,9 @@ impl GridWM {
             }
         }
 
-        // load config
-        let config = Config::from_file("gridwm.toml")?;
-
         // set keyboard layout
         match Command::new("setxkbmap")
-            .arg(config.keyboard.layout)
+            .arg(self.config.keyboard.layout.clone())
             .spawn()
         {
             Ok(_) => {}
@@ -60,7 +60,7 @@ impl GridWM {
         let cursor: Cursor = unsafe { XCreateFontCursor(self.display, 68) };
 
         let (accel_numerator, accel_denominator) =
-            match config.mouse.acceleration_value.as_fraction() {
+            match self.config.mouse.acceleration_value.as_fraction() {
                 Some((a, b)) => (a, b),
                 None => {
                     warn!("failed to get mouse acceleration. falling back to default.");
@@ -82,17 +82,17 @@ impl GridWM {
 
             xlib::XChangePointerControl(
                 self.display,
-                config.mouse.use_acceleration as i32,
-                config.mouse.use_acceleration_threshold as i32,
+                self.config.mouse.use_acceleration as i32,
+                self.config.mouse.use_acceleration_threshold as i32,
                 accel_numerator,
                 accel_denominator,
-                config.mouse.acceleration_threshold,
+                self.config.mouse.acceleration_threshold,
             );
 
             xlib::XDefineCursor(self.display, XDefaultRootWindow(self.display), cursor);
 
             // set background yay
-            self.set_background(config.desktop.color);
+            self.set_background(self.config.desktop.color.clone());
 
             // flush the toilet
             XFlush(self.display);
@@ -103,7 +103,21 @@ impl GridWM {
     pub fn run(&mut self) {
         info!("gridwm running");
 
+        for start_job in &self.config.start.exec {
+            match shell_words::split(start_job) {
+                Ok(parts) => {
+                    let program = &parts[0];
+                    let args = &parts[1..];
+                    let _ = Command::new(program).args(args).spawn();
+                }
+                Err(e) => {
+                    error!("Failed to parse start job '{}': {}", start_job, e);
+                }
+            }
+        }
+
         let mut event: xlib::XEvent = unsafe { zeroed() };
+
         loop {
             unsafe {
                 xlib::XNextEvent(self.display, &mut event);
@@ -213,6 +227,8 @@ impl GridWM {
                 );
 
                 xlib::XRaiseWindow(self.display, target);
+
+                XFlush(self.display);
             }
         }
     }

@@ -7,6 +7,7 @@ use crate::gridwm::error::GridWMError;
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
+    pub start: Start,
     pub keyboard: Keyboard,
     pub mouse: Mouse,
     pub desktop: Desktop,
@@ -63,8 +64,22 @@ impl Default for Desktop {
     }
 }
 
+// start section of config
+#[derive(Debug, Deserialize, Default)]
+#[serde(default)]
+pub struct Start {
+    pub exec: Vec<String>
+}
+
+// ratio for mouse acceleration
 #[derive(Debug, Copy, Clone, Deserialize)]
 pub struct RatioF64(pub f64);
+
+impl RatioF64 {
+    pub fn as_fraction(&self) -> Option<(i32, i32)> {
+        Ratio::approximate_float(self.0).map(|r| (*r.numer(), *r.denom()))
+    }
+}
 
 // functions for config
 impl Config {
@@ -72,11 +87,5 @@ impl Config {
         let s = fs::read_to_string(path)?;
         let cfg: Config = toml::from_str(&s)?;
         Ok(cfg)
-    }
-}
-
-impl RatioF64 {
-    pub fn as_fraction(&self) -> Option<(i32, i32)> {
-        Ratio::approximate_float(self.0).map(|r| (*r.numer(), *r.denom()))
     }
 }
