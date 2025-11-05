@@ -253,14 +253,17 @@ impl GridWM {
 
     fn handle_button(&self, event: xlib::XEvent) {
         let event: XButtonPressedEvent = From::from(event);
+        let target = if event.subwindow != 0 {event.subwindow} else {event.window};
         if event.subwindow != 0 {
             unsafe {
                 xlib::XSetInputFocus(
                     self.display,
-                    event.subwindow,
+                    target,
                     xlib::RevertToParent,
                     xlib::CurrentTime,
                 );
+
+                xlib::XRaiseWindow(self.display, target);
             }
         }
     }
