@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "configparser"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e57e3272f0190c3f1584272d613719ba5fc7df7f4942fe542e63d949cf3a649b"
+
+[[package]]
 name = "deranged"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -24,6 +30,7 @@ dependencies = [
 name = "gridwm"
 version = "0.1.0"
 dependencies = [
+ "configparser",
  "log",
  "simple_logger",
  "thiserror",

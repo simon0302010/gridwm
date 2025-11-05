@@ -3,13 +3,15 @@ use std::{
     collections::BTreeSet,
     ffi::{CString, NulError},
     mem::zeroed,
-    os::unix::process::CommandExt,
     process::Command,
     slice,
 };
 use x11::{
     xinerama,
-    xlib::{self, XButtonPressedEvent, XWindowAttributes, XkbEvent},
+    xlib::{
+        self, Cursor, XButtonPressedEvent, XCreateFontCursor, XDefaultRootWindow, XFlush,
+        XWindowAttributes,
+    },
 };
 
 use thiserror::Error;
@@ -35,13 +37,6 @@ pub type Window = u64;
 
 impl GridWM {
     pub fn new(display_name: &str) -> Result<Self, GridWMError> {
-        match simple_logger::init() {
-            Ok(_) => {}
-            Err(e) => {
-                println!("Failed to start logger: {}", e);
-            }
-        }
-
         let display: *mut xlib::Display =
             unsafe { xlib::XOpenDisplay(CString::new(display_name)?.as_ptr()) };
 
@@ -55,6 +50,19 @@ impl GridWM {
     }
 
     pub fn init(&self) -> Result<(), GridWMError> {
+        match simple_logger::init() {
+            Ok(_) => {}
+            Err(e) => {
+                println!("Failed to start logger: {}", e);
+            }
+        }
+
+        let cursor: Cursor = unsafe { XCreateFontCursor(self.display, 68) };
+
+        let accel_numerator = 1;
+        let accel_denominator = 1;
+        let threshold = 0;
+
         unsafe {
             xlib::XSelectInput(
                 self.display,
@@ -66,6 +74,19 @@ impl GridWM {
                     | xlib::ButtonPressMask
                     | xlib::ButtonReleaseMask,
             );
+
+            xlib::XChangePointerControl(
+                self.display,
+                xlib::True,
+                xlib::True,
+                accel_numerator,
+                accel_denominator,
+                threshold,
+            );
+
+            xlib::XDefineCursor(self.display, XDefaultRootWindow(self.display), cursor);
+
+            XFlush(self.display);
         }
         Ok(())
     }
@@ -84,6 +105,10 @@ impl GridWM {
                     }
                     xlib::UnmapNotify => {
                         self.remove_window(event);
+                        self.layout();
+                    }
+                    xlib::MapNotify => {
+                        self.layout();
                     }
                     xlib::KeyPress => {
                         self.handle_key(event);
@@ -104,7 +129,6 @@ impl GridWM {
         let event: xlib::XMapRequestEvent = From::from(event);
         unsafe { xlib::XMapWindow(self.display, event.window) };
         self.windows.insert(event.window);
-        self.layout();
     }
 
     fn remove_window(&mut self, event: xlib::XEvent) {
@@ -117,7 +141,6 @@ impl GridWM {
                 warn!("tried removing not existing window")
             }
         }
-        self.layout();
     }
 
     fn get_screen_size(&self) -> Result<(i16, i16), GridWMError> {
@@ -128,7 +151,7 @@ impl GridWM {
             let screen = screens.get(0);
 
             if let Some(screen) = screen {
-                Ok((screen.width, screen.width))
+                Ok((screen.width, screen.height))
             } else {
                 Err(GridWMError::ScreenNotFound("0".to_string()))
             }
@@ -158,7 +181,7 @@ impl GridWM {
 
         match keysym {
             x11::keysym::XK_space => {
-                Command::new("konsole").exec();
+                Command::new("konsole").spawn();
             }
             _ => {}
         }

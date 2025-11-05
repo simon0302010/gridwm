@@ -8,3 +8,4 @@ thiserror = "2.0.17"
 x11 = { version = "2.21.0", features = ["xlib", "xinerama"] }
 log = "0.4.*"
 simple_logger = "5.1.*"
+configparser = "3.1.*"
