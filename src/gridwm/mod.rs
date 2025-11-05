@@ -1,11 +1,8 @@
+mod error;
+use error::*;
+
 use log::*;
-use std::{
-    collections::BTreeSet,
-    ffi::{CString, NulError},
-    mem::zeroed,
-    process::Command,
-    slice,
-};
+use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice};
 use x11::{
     xinerama,
     xlib::{
@@ -14,19 +11,7 @@ use x11::{
     },
 };
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum GridWMError {
-    #[error("display {0} not found")]
-    DisplayNotFound(String),
-
-    #[error("{0}")]
-    NulString(#[from] NulError),
-
-    #[error("screen {0} not found")]
-    ScreenNotFound(String),
-}
+use configparser::ini::Ini;
 
 pub struct GridWM {
     display: *mut xlib::Display,
@@ -57,11 +42,90 @@ impl GridWM {
             }
         }
 
+        // load config
+        let mut config = Ini::new();
+        match config.load("gridwm.conf") {
+            Ok(_) => {
+                info!("loaded configuration file");
+            }
+            Err(e) => return Err(GridWMError::ConfigLoadFailed(e)),
+        }
+
+        // set keyboard layout
+        if let Some(layout) = config.get("keyboard", "layout") {
+            match Command::new("setxkbmap").arg(layout).spawn() {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("failed to set keyboard layout: {}", e);
+                }
+            }
+        }
+
         let cursor: Cursor = unsafe { XCreateFontCursor(self.display, 68) };
 
-        let accel_numerator = 1;
-        let accel_denominator = 1;
-        let threshold = 0;
+        let do_accel = match config.getbool("mouse", "use_acceleration") {
+            Ok(accel) => {
+                if let Some(value) = accel {
+                    value as i32
+                } else {
+                    0
+                }
+            }
+            Err(e) => {
+                error!("failed to get mouse acceleration: {}", e);
+                0
+            }
+        };
+        let do_threshold = match config.getbool("mouse", "use_acceleration_threshold") {
+            Ok(thres) => {
+                if let Some(value) = thres {
+                    value as i32
+                } else {
+                    0
+                }
+            }
+            Err(e) => {
+                error!("failed to get mouse acceleration threshold: {}", e);
+                0
+            }
+        };
+        let (accel_numerator, accel_denominator) = match config.get("mouse", "acceleration_value") {
+            Some(accel) => {
+                let mut split_accel = accel.split("/");
+
+                let first_str = split_accel.next().unwrap();
+                let second_str = split_accel.next().unwrap();
+
+                let first = first_str.parse::<i32>();
+                let second = second_str.parse::<i32>();
+
+                match (first, second) {
+                    (Ok(a), Ok(b)) => (a, b),
+                    _ => {
+                        error!("one of the values is not a valid integer");
+                        (1, 1)
+                    }
+                }
+            }
+            None => {
+                error!("failed to get mouse acceleration value");
+                (1, 1)
+            }
+        };
+        let threshold = match config.get("mouse", "acceleration_threshold") {
+            Some(thres) => {
+                let threshold = thres.parse::<i32>();
+
+                match threshold {
+                    Ok(threshold) => threshold,
+                    _ => 0,
+                }
+            }
+            None => {
+                error!("failed to get acceleration threshold");
+                0
+            }
+        };
 
         unsafe {
             xlib::XSelectInput(
@@ -77,8 +141,8 @@ impl GridWM {
 
             xlib::XChangePointerControl(
                 self.display,
-                xlib::True,
-                xlib::True,
+                do_accel,
+                do_threshold,
                 accel_numerator,
                 accel_denominator,
                 threshold,
@@ -148,7 +212,7 @@ impl GridWM {
             let mut num: i32 = 0;
             let screen_pointers = xinerama::XineramaQueryScreens(self.display, &mut num);
             let screens = slice::from_raw_parts(screen_pointers, num as usize).to_vec();
-            let screen = screens.get(0);
+            let screen = screens.first();
 
             if let Some(screen) = screen {
                 Ok((screen.width, screen.height))
@@ -166,7 +230,7 @@ impl GridWM {
         unsafe { xlib::XResizeWindow(self.display, window, width, height) };
     }
 
-    fn get_window_attributes(&self, window: Window) -> XWindowAttributes {
+    fn _get_window_attributes(&self, window: Window) -> XWindowAttributes {
         let mut attrs: XWindowAttributes = unsafe { zeroed() };
         unsafe {
             xlib::XGetWindowAttributes(self.display, window, &mut attrs);
@@ -181,7 +245,7 @@ impl GridWM {
 
         match keysym {
             x11::keysym::XK_space => {
-                Command::new("konsole").spawn();
+                let _ = Command::new("konsole").spawn();
             }
             _ => {}
         }
