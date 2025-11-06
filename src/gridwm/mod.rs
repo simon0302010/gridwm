@@ -8,7 +8,7 @@ use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, sl
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor, XQueryTree, XSetWindowBackground, XWindowAttributes
+        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor, XSetWindowBackground, XWindowAttributes
     },
 };
 
@@ -222,7 +222,7 @@ impl GridWM {
                 xlib::XSetInputFocus(
                     self.display,
                     target,
-                    xlib::RevertToParent,
+                    xlib::RevertToNone,
                     xlib::CurrentTime,
                 );
 
