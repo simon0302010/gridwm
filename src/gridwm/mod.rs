@@ -255,6 +255,8 @@ impl GridWM {
     fn handle_key(&self, event: xlib::XEvent) {
         let event: xlib::XKeyPressedEvent = From::from(event);
 
+        let keysym = unsafe { xlib::XKeycodeToKeysym(self.display, event.keycode as u8, 0) as u32 };
+
         // check keybindings and execute
         for bind in &self.config.keybinds.window {
             if bind.len() != 2 {
@@ -276,6 +278,7 @@ impl GridWM {
             if mask_match && key_match {
                 info!("pressed {}", bind[0]);
             }
+        }
 
         // for testing, will be removed later
         match keysym {
