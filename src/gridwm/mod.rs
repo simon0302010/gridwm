@@ -255,8 +255,29 @@ impl GridWM {
     fn handle_key(&self, event: xlib::XEvent) {
         let event: xlib::XKeyPressedEvent = From::from(event);
 
-        let keysym = unsafe { xlib::XKeycodeToKeysym(self.display, event.keycode as u8, 0) as u32 };
+        // check keybindings and execute
+        for bind in &self.config.keybinds.window {
+            if bind.len() != 2 {
+                error!("failed to parse keybind {:?}: invalid length.", bind);
+                continue;
+            }
 
+            let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone()) {
+                Some((a, b)) => (a, b),
+                None => {
+                    warn!("failed to parse keybind: {:?}", bind);
+                    continue;
+                }
+            };
+
+            let mask_match = event.state & mask == mask;
+            let key_match = event.keycode as i32 == keycode;
+
+            if mask_match && key_match {
+                info!("pressed {}", bind[0]);
+            }
+
+        // for testing, will be removed later
         match keysym {
             x11::keysym::XK_space => {
                 let _ = Command::new("konsole").spawn();
@@ -267,7 +288,7 @@ impl GridWM {
 
     fn handle_button(&self, event: xlib::XEvent) {
         let event: XButtonPressedEvent = From::from(event);
-        
+
         if event.subwindow != 0 {
             unsafe {
                 xlib::XSetInputFocus(
@@ -285,6 +306,7 @@ impl GridWM {
             XFlush(self.display);
         }
     }
+
     fn layout(&self) {
         if self.windows.is_empty() {
             return;
