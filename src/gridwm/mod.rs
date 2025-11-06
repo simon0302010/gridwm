@@ -113,6 +113,18 @@ impl GridWM {
                 );
             }
 
+            // for testing: will remove later
+            let space_keycode = xlib::XKeysymToKeycode(self.display, x11::keysym::XK_space as u64);
+            xlib::XGrabKey(
+                self.display,
+                space_keycode as i32,
+                xlib::Mod4Mask,
+                xlib::XDefaultRootWindow(self.display),
+                1,
+                xlib::GrabModeAsync,
+                xlib::GrabModeAsync,
+            );
+
             xlib::XGrabButton(
                 self.display, 
                 xlib::Button1, 
