@@ -15,6 +15,5 @@ color = "#464646"
 
 [keybinds]
 window = [
-    ["CTRL+SHIFT+R", "close"],
-    ["ALT+SHIFT+SPACE", "close"]
+    ["ALT+SUPER+C", "close"]
 ]

@@ -1,19 +1,19 @@
 mod config;
 mod error;
 mod keybinds;
+mod signals;
 
 use config::Config;
 use error::*;
 use keybinds::*;
+use signals::*;
 
 use log::*;
 use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice};
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor,
-        XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor,
-        XSetWindowBackground, XWindowAttributes,
+        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
     },
 };
 
@@ -288,7 +288,13 @@ impl GridWM {
             let event_mask = event.state & relevant_modifiers;
 
             if event_mask == mask && event.keycode as i32 == keycode {
-                info!("pressed {}", bind[0]);
+                match bind[1].as_str() {
+                    "close" => {
+                        send_wm_delete_window(self.display, event.subwindow);
+                        unsafe { XUnmapWindow(self.display, event.subwindow); }
+                    }
+                    _ => {}
+                }
             }
         }
 
