@@ -107,7 +107,7 @@ impl GridWM {
                     keycode, 
                     mask,
                     root,
-                    1,
+                    0,
                     xlib::GrabModeAsync,
                     xlib::GrabModeAsync,
                 );
@@ -272,10 +272,10 @@ impl GridWM {
                 }
             };
 
-            let mask_match = event.state & mask == mask;
-            let key_match = event.keycode as i32 == keycode;
+            let relevant_modifiers: u32 = xlib::ControlMask | xlib::ShiftMask | xlib::Mod1Mask | xlib::Mod4Mask;
+            let event_mask = event.state & relevant_modifiers;
 
-            if mask_match && key_match {
+            if event_mask == mask && event.keycode as i32 == keycode {
                 info!("pressed {}", bind[0]);
             }
         }
