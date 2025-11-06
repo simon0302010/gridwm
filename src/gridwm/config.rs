@@ -68,7 +68,7 @@ impl Default for Desktop {
 #[derive(Debug, Deserialize, Default)]
 #[serde(default)]
 pub struct Start {
-    pub exec: Vec<String>
+    pub exec: Vec<String>,
 }
 
 // ratio for mouse acceleration

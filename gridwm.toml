@@ -1,5 +1,5 @@
 [start]
-exec = ["konsole"]
+exec = []
 
 [keyboard]
 layout = "de"

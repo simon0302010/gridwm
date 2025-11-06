@@ -8,14 +8,16 @@ use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, sl
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor, XSetWindowBackground, XWindowAttributes
+        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor,
+        XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor,
+        XSetWindowBackground, XWindowAttributes,
     },
 };
 
 pub struct GridWM {
     display: *mut xlib::Display,
     windows: BTreeSet<Window>,
-    config: Config
+    config: Config,
 }
 
 pub type Window = u64;
@@ -35,7 +37,11 @@ impl GridWM {
         // load config
         let config = Config::from_file("gridwm.toml")?; // load config here
 
-        Ok(GridWM { display, windows, config })
+        Ok(GridWM {
+            display,
+            windows,
+            config,
+        })
     }
 
     pub fn init(&self) -> Result<(), GridWMError> {
@@ -74,10 +80,20 @@ impl GridWM {
                 xlib::XDefaultRootWindow(self.display),
                 xlib::SubstructureRedirectMask
                     | xlib::SubstructureNotifyMask
-                    | xlib::KeyPressMask
-                    | xlib::KeyReleaseMask
                     | xlib::ButtonPressMask
                     | xlib::ButtonReleaseMask,
+            );
+
+            // Grab Mod4 (Super/Windows key) + Space to spawn konsole
+            let space_keycode = xlib::XKeysymToKeycode(self.display, x11::keysym::XK_space as u64);
+            xlib::XGrabKey(
+                self.display,
+                space_keycode as i32,
+                xlib::Mod4Mask,
+                xlib::XDefaultRootWindow(self.display),
+                1,
+                xlib::GrabModeAsync,
+                xlib::GrabModeAsync,
             );
 
             xlib::XChangePointerControl(
@@ -131,6 +147,16 @@ impl GridWM {
                         self.layout();
                     }
                     xlib::MapNotify => {
+                        // set focus when window is mapped
+                        let map_event: xlib::XMapEvent = From::from(event);
+                        if self.windows.contains(&map_event.window) {
+                            xlib::XSetInputFocus(
+                                self.display,
+                                map_event.window,
+                                xlib::RevertToPointerRoot,
+                                xlib::CurrentTime,
+                            );
+                        }
                         self.layout();
                     }
                     xlib::KeyPress => {
@@ -152,6 +178,22 @@ impl GridWM {
         let event: xlib::XMapRequestEvent = From::from(event);
         unsafe { xlib::XMapWindow(self.display, event.window) };
         self.windows.insert(event.window);
+
+        unsafe {
+            // grab left mouse button to focus windows on click
+            xlib::XGrabButton(
+                self.display,
+                xlib::Button1,
+                xlib::AnyModifier,
+                event.window,
+                1, // owner events true
+                (xlib::ButtonPressMask | xlib::ButtonReleaseMask) as u32,
+                xlib::GrabModeSync,
+                xlib::GrabModeAsync,
+                0,
+                0,
+            );
+        };
     }
 
     fn remove_window(&mut self, event: xlib::XEvent) {
@@ -217,19 +259,25 @@ impl GridWM {
         } else {
             event.window
         };
-        if event.subwindow != 0 {
-            unsafe {
+        
+        unsafe {
+            let root = xlib::XDefaultRootWindow(self.display);
+            
+            // focus any other window than the root
+            if target != root {
                 xlib::XSetInputFocus(
                     self.display,
                     target,
-                    xlib::RevertToNone,
+                    xlib::RevertToPointerRoot,
                     xlib::CurrentTime,
                 );
-
                 xlib::XRaiseWindow(self.display, target);
-
-                XFlush(self.display);
             }
+            
+            // Always replay the pointer event so apps can process clicks
+            xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
+            
+            XFlush(self.display);
         }
     }
 
