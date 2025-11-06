@@ -88,7 +88,7 @@ impl GridWM {
             );
 
             // grab keys for keybindings
-            for bind in &self.config.keybinds.window {
+            for bind in self.config.keybinds.window.iter().chain(self.config.keybinds.exec.iter()) {
                 if bind.len() != 2 {
                     error!("failed to parse keybind {:?}: invalid length.", bind);
                     continue;
@@ -112,18 +112,6 @@ impl GridWM {
                     xlib::GrabModeAsync,
                 );
             }
-
-            // for testing: will remove later
-            let space_keycode = xlib::XKeysymToKeycode(self.display, x11::keysym::XK_space as u64);
-            xlib::XGrabKey(
-                self.display,
-                space_keycode as i32,
-                xlib::Mod4Mask,
-                xlib::XDefaultRootWindow(self.display),
-                1,
-                xlib::GrabModeAsync,
-                xlib::GrabModeAsync,
-            );
 
             xlib::XGrabButton(
                 self.display, 
@@ -290,10 +278,44 @@ impl GridWM {
             if event_mask == mask && event.keycode as i32 == keycode {
                 match bind[1].as_str() {
                     "close" => {
-                        send_wm_delete_window(self.display, event.subwindow);
-                        unsafe { XUnmapWindow(self.display, event.subwindow); }
+                        if event.subwindow != unsafe { XDefaultRootWindow(self.display) } && event.subwindow != 0 {
+                            send_wm_delete_window(self.display, event.subwindow);
+                            unsafe { XUnmapWindow(self.display, event.subwindow); }
+                        }
                     }
                     _ => {}
+                }
+            }
+        }
+
+        // check keybindings for commands and execute
+        for bind in &self.config.keybinds.exec {
+            if bind.len() != 2 {
+                error!("failed to parse keybind {:?}: invalid length.", bind);
+                continue;
+            }
+
+            let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone()) {
+                Some((a, b)) => (a, b),
+                None => {
+                    warn!("failed to parse keybind: {:?}", bind);
+                    continue;
+                }
+            };
+
+            let relevant_modifiers: u32 = xlib::ControlMask | xlib::ShiftMask | xlib::Mod1Mask | xlib::Mod4Mask;
+            let event_mask = event.state & relevant_modifiers;
+
+            if event_mask == mask && event.keycode as i32 == keycode {
+                match shell_words::split(&bind[1].as_str()) {
+                    Ok(parts) => {
+                        let program = &parts[0];
+                        let args = &parts[1..];
+                        let _ = Command::new(program).args(args).spawn();
+                    }
+                    Err(e) => {
+                        error!("Failed to parse keybinding '{}': {}", bind[1], e);
+                    }
                 }
             }
         }

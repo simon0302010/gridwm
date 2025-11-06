@@ -70,11 +70,12 @@ impl Default for Desktop {
 #[serde(default)]
 pub struct Keybinds {
     pub window: Vec<Vec<String>>,
+    pub exec: Vec<Vec<String>>
 }
 
 impl Default for Keybinds {
     fn default() -> Self {
-        Self { window: Vec::new() }
+        Self { window: Vec::new(), exec: Vec::new() }
     }
 }
 

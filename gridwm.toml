@@ -17,3 +17,6 @@ color = "#464646"
 window = [
     ["ALT+SUPER+C", "close"]
 ]
+exec = [
+    ["ALT+Z", "konsole"]
+]
