@@ -25,6 +25,13 @@ pub struct GridWM {
 
 pub type Window = u64;
 
+struct WindowInfo {
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32
+}
+
 impl GridWM {
     pub fn new(display_name: &str) -> Result<Self, GridWMError> {
         let display: *mut xlib::Display =
@@ -356,14 +363,31 @@ impl GridWM {
         }
 
         if let Ok((screen_w, screen_h)) = self.get_screen_size() {
-            let window_width: i16 = screen_w / self.windows.iter().len() as i16;
-            let mut current_x = 0;
-            for window in &self.windows {
-                self.move_window(*window, current_x, 0);
-                self.resize_window(*window, window_width as u32, screen_h as u32);
-                current_x += window_width as i32;
+            let positions = self.tile(self.windows.len(), screen_w as i32, screen_h as i32);
+            for (id, window) in self.windows.iter().zip(positions) {
+                self.resize_window(*id, window.w as u32, window.h as u32);
+                self.move_window(*id, window.x, window.y);
             }
         }
+    }
+
+    fn tile(&self, n: usize, screen_w: i32, screen_h: i32) -> Vec<WindowInfo> {
+        let cols = (n as f32).sqrt().ceil() as i32;
+        let rows = ((n as i32 + cols - 1) / cols) as i32;
+        let w = screen_w / cols;
+        let h = screen_h / rows;
+
+        (0..n)
+            .map(|i| {
+                let i = i as i32;
+                WindowInfo {
+                    x: (i % cols) * w,
+                    y: (i / cols) * h,
+                    w,
+                    h
+                }
+            })
+            .collect()
     }
 
     fn set_background(&self, hex: String) {
