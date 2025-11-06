@@ -1,7 +1,10 @@
 mod config;
 mod error;
+mod keybinds;
+
 use config::Config;
 use error::*;
+use keybinds::*;
 
 use log::*;
 use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice};
@@ -75,30 +78,46 @@ impl GridWM {
             };
 
         unsafe {
+            let root = XDefaultRootWindow(self.display);
+
             xlib::XSelectInput(
                 self.display,
-                xlib::XDefaultRootWindow(self.display),
+                root,
                 xlib::SubstructureRedirectMask
                     | xlib::SubstructureNotifyMask
             );
 
-            // Grab Mod4 (Super/Windows key) + Space to spawn konsole
-            let space_keycode = xlib::XKeysymToKeycode(self.display, x11::keysym::XK_space as u64);
-            xlib::XGrabKey(
-                self.display,
-                space_keycode as i32,
-                xlib::Mod4Mask,
-                xlib::XDefaultRootWindow(self.display),
-                1,
-                xlib::GrabModeAsync,
-                xlib::GrabModeAsync,
-            );
+            // grab keys for keybindings
+            for bind in &self.config.keybinds.window {
+                if bind.len() != 2 {
+                    error!("failed to parse keybind {:?}: invalid length.", bind);
+                    continue;
+                }
+
+                let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone()) {
+                    Some((a, b)) => (a, b),
+                    None => {
+                        warn!("failed to parse keybind: {:?}", bind);
+                        continue;
+                    }
+                };
+
+                xlib::XGrabKey(
+                    self.display, 
+                    keycode, 
+                    mask,
+                    root,
+                    1,
+                    xlib::GrabModeAsync,
+                    xlib::GrabModeAsync,
+                );
+            }
 
             xlib::XGrabButton(
                 self.display, 
                 xlib::Button1, 
                 xlib::AnyModifier, 
-                xlib::XDefaultRootWindow(self.display), 
+                root, 
                 1, 
                 (xlib::ButtonPressMask | xlib::ButtonReleaseMask) as u32, 
                 xlib::GrabModeSync, 
@@ -115,7 +134,7 @@ impl GridWM {
                 self.config.mouse.acceleration_threshold,
             );
 
-            xlib::XDefineCursor(self.display, XDefaultRootWindow(self.display), cursor);
+            xlib::XDefineCursor(self.display, root, cursor);
 
             // set background yay
             self.set_background(self.config.desktop.color.clone());

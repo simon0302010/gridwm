@@ -12,3 +12,8 @@ acceleration_threshold = 5
 
 [desktop]
 color = "#464646"
+
+[keybinds]
+window = [
+    ["SUPER+C", "close"]
+]
