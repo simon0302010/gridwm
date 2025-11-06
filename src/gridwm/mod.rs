@@ -80,8 +80,6 @@ impl GridWM {
                 xlib::XDefaultRootWindow(self.display),
                 xlib::SubstructureRedirectMask
                     | xlib::SubstructureNotifyMask
-                    | xlib::ButtonPressMask
-                    | xlib::ButtonReleaseMask,
             );
 
             // Grab Mod4 (Super/Windows key) + Space to spawn konsole
@@ -94,6 +92,18 @@ impl GridWM {
                 1,
                 xlib::GrabModeAsync,
                 xlib::GrabModeAsync,
+            );
+
+            xlib::XGrabButton(
+                self.display, 
+                xlib::Button1, 
+                xlib::AnyModifier, 
+                xlib::XDefaultRootWindow(self.display), 
+                1, 
+                (xlib::ButtonPressMask | xlib::ButtonReleaseMask) as u32, 
+                xlib::GrabModeSync, 
+                xlib::GrabModeAsync, 
+                0, 0
             );
 
             xlib::XChangePointerControl(
@@ -178,22 +188,6 @@ impl GridWM {
         let event: xlib::XMapRequestEvent = From::from(event);
         unsafe { xlib::XMapWindow(self.display, event.window) };
         self.windows.insert(event.window);
-
-        unsafe {
-            // grab left mouse button to focus windows on click
-            xlib::XGrabButton(
-                self.display,
-                xlib::Button1,
-                xlib::AnyModifier,
-                event.window,
-                1, // owner events true
-                (xlib::ButtonPressMask | xlib::ButtonReleaseMask) as u32,
-                xlib::GrabModeSync,
-                xlib::GrabModeAsync,
-                0,
-                0,
-            );
-        };
     }
 
     fn remove_window(&mut self, event: xlib::XEvent) {
@@ -254,33 +248,24 @@ impl GridWM {
 
     fn handle_button(&self, event: xlib::XEvent) {
         let event: XButtonPressedEvent = From::from(event);
-        let target = if event.subwindow != 0 {
-            event.subwindow
-        } else {
-            event.window
-        };
         
-        unsafe {
-            let root = xlib::XDefaultRootWindow(self.display);
-            
-            // focus any other window than the root
-            if target != root {
+        if event.subwindow != 0 {
+            unsafe {
                 xlib::XSetInputFocus(
                     self.display,
-                    target,
+                    event.subwindow,
                     xlib::RevertToPointerRoot,
                     xlib::CurrentTime,
                 );
-                xlib::XRaiseWindow(self.display, target);
+                xlib::XRaiseWindow(self.display, event.subwindow);
+                XFlush(self.display);
             }
-            
-            // Always replay the pointer event so apps can process clicks
+        }
+        unsafe {
             xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
-            
             XFlush(self.display);
         }
     }
-
     fn layout(&self) {
         if self.windows.is_empty() {
             return;
