@@ -15,8 +15,10 @@ color = "#464646"
 
 [keybinds]
 window = [
-    ["ALT+SUPER+C", "close"]
+    ["ALT+SUPER+C", "close"],
+    ["SUPER+C", "close"]
 ]
 exec = [
-    ["ALT+Z", "konsole"]
+    ["SUPER+ENTER", "konsole"],
+    ["SUPER+SPACE", "rofi -show drun"]
 ]

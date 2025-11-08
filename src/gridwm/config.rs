@@ -11,7 +11,7 @@ pub struct Config {
     pub keyboard: Keyboard,
     pub mouse: Mouse,
     pub desktop: Desktop,
-    pub keybinds: Keybinds
+    pub keybinds: Keybinds,
 }
 
 // keyboard section of config
@@ -70,12 +70,15 @@ impl Default for Desktop {
 #[serde(default)]
 pub struct Keybinds {
     pub window: Vec<Vec<String>>,
-    pub exec: Vec<Vec<String>>
+    pub exec: Vec<Vec<String>>,
 }
 
 impl Default for Keybinds {
     fn default() -> Self {
-        Self { window: Vec::new(), exec: Vec::new() }
+        Self {
+            window: Vec::new(),
+            exec: Vec::new(),
+        }
     }
 }
 

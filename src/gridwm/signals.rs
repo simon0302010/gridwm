@@ -1,6 +1,8 @@
 use std::ffi::CString;
 
-use x11::xlib::{ClientMessage, CurrentTime, Display, NoEventMask, XEvent, XInternAtom, XSendEvent};
+use x11::xlib::{
+    ClientMessage, CurrentTime, Display, NoEventMask, XEvent, XInternAtom, XSendEvent,
+};
 
 use crate::gridwm::Window;
 

@@ -2,7 +2,7 @@ use x11::xlib;
 
 pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, i32)> {
     let keys = keys.split("+").map(|s| s.trim()).collect::<Vec<&str>>();
-    
+
     let mut mask = 0;
     let mut key: Option<String> = None;
 
@@ -13,7 +13,7 @@ pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, 
             "SHIFT" => mask |= xlib::ShiftMask,
             "ALT" => mask |= xlib::Mod1Mask,
             "SUPER" | "WIN" | "WINDOWS" | "MOD4" => mask |= xlib::Mod4Mask,
-            _ => key = Some(k_upper.clone())
+            _ => key = Some(k_upper.clone()),
         }
     }
 

@@ -9,11 +9,16 @@ use keybinds::*;
 use signals::*;
 
 use log::*;
-use std::{collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice};
+use std::{
+    collections::BTreeSet, ffi::CString, mem::zeroed, os::unix::process::CommandExt,
+    process::Command, slice,
+};
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
+        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor,
+        XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor,
+        XSetWindowBackground, XUnmapWindow, XWindowAttributes,
     },
 };
 
@@ -29,7 +34,7 @@ struct WindowInfo {
     x: i32,
     y: i32,
     w: i32,
-    h: i32
+    h: i32,
 }
 
 impl GridWM {
@@ -66,6 +71,7 @@ impl GridWM {
         match Command::new("setxkbmap")
             .arg(self.config.keyboard.layout.clone())
             .spawn()
+            .and_then(|mut child| child.wait())
         {
             Ok(_) => {}
             Err(e) => {
@@ -90,18 +96,31 @@ impl GridWM {
             xlib::XSelectInput(
                 self.display,
                 root,
-                xlib::SubstructureRedirectMask
-                    | xlib::SubstructureNotifyMask
+                xlib::SubstructureRedirectMask | xlib::SubstructureNotifyMask,
             );
 
+            const EXTRA_MODS: [u32; 4] = [
+                0,
+                xlib::LockMask,
+                xlib::Mod2Mask,
+                xlib::LockMask | xlib::Mod2Mask,
+            ];
+
             // grab keys for keybindings
-            for bind in self.config.keybinds.window.iter().chain(self.config.keybinds.exec.iter()) {
+            for bind in self
+                .config
+                .keybinds
+                .window
+                .iter()
+                .chain(self.config.keybinds.exec.iter())
+            {
                 if bind.len() != 2 {
                     error!("failed to parse keybind {:?}: invalid length.", bind);
                     continue;
                 }
 
-                let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone()) {
+                let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone())
+                {
                     Some((a, b)) => (a, b),
                     None => {
                         warn!("failed to parse keybind: {:?}", bind);
@@ -109,27 +128,30 @@ impl GridWM {
                     }
                 };
 
-                xlib::XGrabKey(
-                    self.display, 
-                    keycode, 
-                    mask,
-                    root,
-                    0,
-                    xlib::GrabModeAsync,
-                    xlib::GrabModeAsync,
-                );
+                for &extra_mod in &EXTRA_MODS {
+                    xlib::XGrabKey(
+                        self.display,
+                        keycode,
+                        mask | extra_mod,
+                        root,
+                        0,
+                        xlib::GrabModeAsync,
+                        xlib::GrabModeAsync,
+                    );
+                }
             }
 
             xlib::XGrabButton(
-                self.display, 
-                xlib::Button1, 
-                xlib::AnyModifier, 
-                root, 
-                1, 
-                (xlib::ButtonPressMask | xlib::ButtonReleaseMask) as u32, 
-                xlib::GrabModeSync, 
-                xlib::GrabModeAsync, 
-                0, 0
+                self.display,
+                xlib::Button1,
+                xlib::AnyModifier,
+                root,
+                1,
+                (xlib::ButtonPressMask | xlib::ButtonReleaseMask) as u32,
+                xlib::GrabModeSync,
+                xlib::GrabModeAsync,
+                0,
+                0,
             );
 
             xlib::XChangePointerControl(
@@ -262,8 +284,6 @@ impl GridWM {
     fn handle_key(&self, event: xlib::XEvent) {
         let event: xlib::XKeyPressedEvent = From::from(event);
 
-        let keysym = unsafe { xlib::XKeycodeToKeysym(self.display, event.keycode as u8, 0) as u32 };
-
         // check keybindings and execute
         for bind in &self.config.keybinds.window {
             if bind.len() != 2 {
@@ -279,15 +299,20 @@ impl GridWM {
                 }
             };
 
-            let relevant_modifiers: u32 = xlib::ControlMask | xlib::ShiftMask | xlib::Mod1Mask | xlib::Mod4Mask;
+            let relevant_modifiers: u32 =
+                xlib::ControlMask | xlib::ShiftMask | xlib::Mod1Mask | xlib::Mod4Mask;
             let event_mask = event.state & relevant_modifiers;
 
             if event_mask == mask && event.keycode as i32 == keycode {
                 match bind[1].as_str() {
                     "close" => {
-                        if event.subwindow != unsafe { XDefaultRootWindow(self.display) } && event.subwindow != 0 {
+                        if event.subwindow != unsafe { XDefaultRootWindow(self.display) }
+                            && event.subwindow != 0
+                        {
                             send_wm_delete_window(self.display, event.subwindow);
-                            unsafe { XUnmapWindow(self.display, event.subwindow); }
+                            unsafe {
+                                XUnmapWindow(self.display, event.subwindow);
+                            }
                         }
                     }
                     _ => {}
@@ -310,7 +335,8 @@ impl GridWM {
                 }
             };
 
-            let relevant_modifiers: u32 = xlib::ControlMask | xlib::ShiftMask | xlib::Mod1Mask | xlib::Mod4Mask;
+            let relevant_modifiers: u32 =
+                xlib::ControlMask | xlib::ShiftMask | xlib::Mod1Mask | xlib::Mod4Mask;
             let event_mask = event.state & relevant_modifiers;
 
             if event_mask == mask && event.keycode as i32 == keycode {
@@ -325,14 +351,6 @@ impl GridWM {
                     }
                 }
             }
-        }
-
-        // for testing, will be removed later
-        match keysym {
-            x11::keysym::XK_space => {
-                let _ = Command::new("konsole").spawn();
-            }
-            _ => {}
         }
     }
 
@@ -358,13 +376,19 @@ impl GridWM {
     }
 
     fn layout(&self) {
-        if self.windows.is_empty() {
+        let tileable: Vec<Window> = self.windows
+            .iter()
+            .copied()
+            .filter(|&w| self.is_tileable(w))
+            .collect();
+
+        if tileable.is_empty() {
             return;
         }
 
         if let Ok((screen_w, screen_h)) = self.get_screen_size() {
-            let positions = self.tile(self.windows.len(), screen_w as i32, screen_h as i32);
-            for (id, window) in self.windows.iter().zip(positions) {
+            let positions = self.tile(tileable.len(), screen_w as i32, screen_h as i32);
+            for (id, window) in tileable.iter().zip(positions) {
                 self.resize_window(*id, window.w as u32, window.h as u32);
                 self.move_window(*id, window.x, window.y);
             }
@@ -384,10 +408,56 @@ impl GridWM {
                     x: (i % cols) * w,
                     y: (i / cols) * h,
                     w,
-                    h
+                    h,
                 }
             })
             .collect()
+    }
+
+    fn is_tileable(&self, window: Window) -> bool {
+        unsafe {
+            let window_type = xlib::XInternAtom(
+                self.display,
+                b"_NET_WM_WINDOW_TYPE\0".as_ptr() as *const i8,
+                0,
+            );
+            let notification_type = xlib::XInternAtom(
+                self.display,
+                b"_NET_WM_WINDOW_TYPE_NOTIFICATION\0".as_ptr() as *const i8,
+                0,
+            );
+            let dock_type = xlib::XInternAtom(
+                self.display,
+                b"_NET_WM_WINDOW_TYPE_DOCK\0".as_ptr() as *const i8,
+                0,
+            );
+
+            let mut actual_type: xlib::Atom = 0;
+            let mut actual_format: i32 = 0;
+            let mut nitems: u64 = 0;
+            let mut bytes_after: u64 = 0;
+            let mut prop: *mut u8 = std::ptr::null_mut();
+
+            if xlib::XGetWindowProperty(
+                self.display, 
+                window, 
+                window_type, 
+                0, 1, 0, 
+                xlib::XA_ATOM, 
+                &mut actual_type, 
+                &mut actual_format, 
+                &mut nitems, 
+                &mut bytes_after,
+                &mut prop,
+            ) == 0
+                && nitems > 0
+            {
+                let wtype = *(prop as *const xlib::Atom);
+                libc::free(prop as *mut _);
+                return wtype != notification_type && wtype != dock_type;
+            }
+            true
+        }
     }
 
     fn set_background(&self, hex: String) {
