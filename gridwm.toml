@@ -12,7 +12,11 @@ acceleration_threshold = 5
 
 [desktop]
 color = "#464646"
-bar_color = "#ff0000"
+
+[bar]
+text_color = "#ffffff"
+background_color = "#000000"
+height = 20
 
 [keybinds]
 gridwm = [

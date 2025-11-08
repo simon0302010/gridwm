@@ -10,12 +10,15 @@ use signals::*;
 
 use log::*;
 use std::{
-    collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice
+    collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice, sync::mpsc, thread,
+    time::Duration,
 };
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
+        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor,
+        XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues,
+        XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes,
     },
 };
 
@@ -23,7 +26,7 @@ pub struct GridWM {
     display: *mut xlib::Display,
     config: Config,
     desktops: Vec<BTreeSet<Window>>,
-    current_desktop: usize
+    current_desktop: usize,
 }
 
 pub type Window = u64;
@@ -55,7 +58,7 @@ impl GridWM {
             display,
             config,
             desktops,
-            current_desktop
+            current_desktop,
         })
     }
 
@@ -200,6 +203,15 @@ impl GridWM {
             }
         }
 
+        let (timer_tx, timer_rx) = mpsc::channel();
+
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_secs(1));
+                timer_tx.send(()).ok();
+            }
+        });
+
         let mut event: xlib::XEvent = unsafe { zeroed() };
 
         loop {
@@ -239,6 +251,10 @@ impl GridWM {
                         // debug!("event triggered: {:?}", event);
                     }
                 }
+            }
+
+            if let Ok(_) = timer_rx.try_recv() {
+                self.draw_bar();
             }
         }
     }
@@ -343,7 +359,11 @@ impl GridWM {
                         self.change_desktop(self.current_desktop + 1);
                     }
                     "desktop_left" => {
-                        self.change_desktop(if self.current_desktop > 0 { self.current_desktop - 1 } else { 0 });
+                        self.change_desktop(if self.current_desktop > 0 {
+                            self.current_desktop - 1
+                        } else {
+                            0
+                        });
                     }
                     _ => {}
                 }
@@ -433,18 +453,33 @@ impl GridWM {
             let desktop_str = match CString::new(format!("Desktop {}", self.current_desktop + 1)) {
                 Ok(stri) => stri,
                 Err(e) => {
-                    warn!("failed to create cstring for current desktop number: {}.", e);
+                    warn!(
+                        "failed to create cstring for current desktop number: {}.",
+                        e
+                    );
                     return;
                 }
             };
 
             let screen = XDefaultScreen(self.display);
             let mut bar_color: XColor = std::mem::zeroed();
+            let mut background_color: XColor = std::mem::zeroed();
 
-            let hex_str = match CString::new(self.config.desktop.bar_color.clone()) {
+            let bar_hex_str = match CString::new(self.config.bar.text_color.clone()) {
                 Ok(hex_str) => hex_str,
                 Err(e) => {
-                    error!("failed to convert bar color str to cstring: {}", e);
+                    error!("failed to convert bar text color str to cstring: {}", e);
+                    return;
+                }
+            };
+
+            let background_hex_str = match CString::new(self.config.bar.background_color.clone()) {
+                Ok(hex_str) => hex_str,
+                Err(e) => {
+                    error!(
+                        "failed to convert bar background color str to cstring: {}",
+                        e
+                    );
                     return;
                 }
             };
@@ -452,11 +487,21 @@ impl GridWM {
             if XParseColor(
                 self.display,
                 XDefaultColormap(self.display, screen),
-                hex_str.as_ptr(),
+                bar_hex_str.as_ptr(),
                 &mut bar_color,
             ) != 1
             {
-                error!("failed to parse bar color");
+                error!("failed to parse bar text color");
+            }
+
+            if XParseColor(
+                self.display,
+                XDefaultColormap(self.display, screen),
+                background_hex_str.as_ptr(),
+                &mut background_color,
+            ) != 1
+            {
+                error!("failed to parse bar background color");
             }
 
             XAllocColor(
@@ -465,17 +510,63 @@ impl GridWM {
                 &mut bar_color,
             );
 
-            let gcv = XGCValues {
+            XAllocColor(
+                self.display,
+                XDefaultColormap(self.display, screen),
+                &mut background_color,
+            );
+
+            let bar_gcv = XGCValues {
                 foreground: bar_color.pixel,
                 background: 0,
                 font: 0,
                 ..std::mem::zeroed()
             };
 
-            let gc = xlib::XCreateGC(self.display, root, GCForeground as u64, &gcv as *const _ as *mut _);
+            let background_gcv = XGCValues {
+                foreground: background_color.pixel,
+                background: 0,
+                font: 0,
+                ..std::mem::zeroed()
+            };
 
-            xlib::XClearArea(self.display, root, 0, 0, 200, 100, 0);
-            xlib::XDrawString(self.display, root, gc, 5, 15, desktop_str.as_ptr() as *const i8, desktop_str.to_bytes().len() as i32);
+            let bar_gc = xlib::XCreateGC(
+                self.display,
+                root,
+                GCForeground as u64,
+                &bar_gcv as *const _ as *mut _,
+            );
+
+            let background_gc = xlib::XCreateGC(
+                self.display,
+                root,
+                GCForeground as u64,
+                &background_gcv as *const _ as *mut _,
+            );
+
+            if let Ok((screen_w, _)) = self.get_screen_size() {
+                xlib::XClearArea(self.display, root, 0, 0, screen_w as u32, 50, 0);
+                xlib::XFillRectangle(
+                    self.display,
+                    root,
+                    background_gc,
+                    0,
+                    0,
+                    screen_w as u32,
+                    self.config.bar.height,
+                );
+            } else {
+                xlib::XClearArea(self.display, root, 0, 0, 500, 50, 0);
+            }
+            xlib::XDrawString(
+                self.display,
+                root,
+                bar_gc,
+                5,
+                15,
+                desktop_str.as_ptr() as *const i8,
+                desktop_str.to_bytes().len() as i32,
+            );
         }
     }
 
@@ -498,20 +589,28 @@ impl GridWM {
                 self.move_window(*id, window.x, window.y);
             }
         }
+
+        self.draw_bar();
     }
 
     fn tile(&self, n: usize, screen_w: i32, screen_h: i32) -> Vec<WindowInfo> {
         let cols = (n as f32).sqrt().ceil() as i32;
         let rows = ((n as i32 + cols - 1) / cols) as i32;
         let w = screen_w / cols;
-        let h = screen_h / rows;
+        let h = (screen_h
+            - if screen_h < self.config.bar.height as i32 {
+                0
+            } else {
+                self.config.bar.height as i32
+            })
+            / rows;
 
         (0..n)
             .map(|i| {
                 let i = i as i32;
                 WindowInfo {
                     x: (i % cols) * w,
-                    y: (i / cols) * h,
+                    y: ((i / cols) * h) + self.config.bar.height as i32,
                     w,
                     h,
                 }

@@ -11,6 +11,7 @@ pub struct Config {
     pub keyboard: Keyboard,
     pub mouse: Mouse,
     pub desktop: Desktop,
+    pub bar: Bar,
     pub keybinds: Keybinds,
 }
 
@@ -23,9 +24,7 @@ pub struct Keyboard {
 
 impl Default for Keyboard {
     fn default() -> Self {
-        Self {
-            layout: "".into(),
-        }
+        Self { layout: "".into() }
     }
 }
 
@@ -55,14 +54,31 @@ impl Default for Mouse {
 #[serde(default)]
 pub struct Desktop {
     pub color: String,
-    pub bar_color: String
 }
 
 impl Default for Desktop {
     fn default() -> Self {
         Self {
-            color: "#464646".to_string(),
-            bar_color: "#ff0000".to_string(),
+            color: "#464646".into(),
+        }
+    }
+}
+
+// bar section of config
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Bar {
+    pub text_color: String,
+    pub background_color: String,
+    pub height: u32,
+}
+
+impl Default for Bar {
+    fn default() -> Self {
+        Self {
+            text_color: "#ff0000".into(),
+            background_color: "#272727".into(),
+            height: 20,
         }
     }
 }
