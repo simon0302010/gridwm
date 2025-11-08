@@ -24,7 +24,7 @@ pub struct Keyboard {
 impl Default for Keyboard {
     fn default() -> Self {
         Self {
-            layout: "us".into(),
+            layout: "".into(),
         }
     }
 }

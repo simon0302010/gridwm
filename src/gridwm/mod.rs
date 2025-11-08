@@ -68,19 +68,25 @@ impl GridWM {
         }
 
         // set keyboard layout
-        match Command::new("setxkbmap")
-            .arg(self.config.keyboard.layout.clone())
-            .spawn()
-            .and_then(|mut child| child.wait())
-        {
-            Ok(_) => {}
-            Err(e) => {
-                error!("failed to set keyboard layout: {}", e);
+        if !self.config.keyboard.layout.is_empty() {
+            match Command::new("setxkbmap")
+                .arg(self.config.keyboard.layout.clone())
+                .spawn()
+                .and_then(|mut child| child.wait())
+            {
+                Ok(_) => {}
+                Err(e) => {
+                    error!("failed to set keyboard layout: {}", e);
+                }
             }
+        } else {
+            info!("not setting keyboard layout by user choice");
         }
 
+        // default pointy cursor
         let cursor: Cursor = unsafe { XCreateFontCursor(self.display, 68) };
 
+        // setting da mouse acceleationnnn vrooom
         let (accel_numerator, accel_denominator) =
             match self.config.mouse.acceleration_value.as_fraction() {
                 Some((a, b)) => (a, b),
@@ -90,6 +96,7 @@ impl GridWM {
                 }
             };
 
+        // asdhu9aduiahidadhnihihasdhiahdoagfilkzurl
         unsafe {
             let root = XDefaultRootWindow(self.display);
 
