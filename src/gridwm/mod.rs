@@ -15,9 +15,7 @@ use std::{
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor,
-        XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XParseColor,
-        XSetWindowBackground, XUnmapWindow, XWindowAttributes,
+        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
     },
 };
 
@@ -172,6 +170,9 @@ impl GridWM {
 
             // flush the toilet
             XFlush(self.display);
+
+            // draw bar for the first time yahooooo
+            self.draw_bar();
         }
         Ok(())
     }
@@ -228,7 +229,7 @@ impl GridWM {
                         self.handle_button(event);
                     }
                     _ => {
-                        debug!("event triggered: {:?}", event);
+                        // debug!("event triggered: {:?}", event);
                     }
                 }
             }
@@ -399,9 +400,10 @@ impl GridWM {
     }
 
     fn change_desktop(&mut self, index: usize) {
+        if index == self.current_desktop {
+            return;
+        }
         unsafe {
-            let root = XDefaultRootWindow(self.display);
-
             for window in self.get_desktop(self.current_desktop) {
                 xlib::XUnmapWindow(self.display, window);
                 xlib::XUnmapSubwindows(self.display, window);
@@ -410,8 +412,64 @@ impl GridWM {
                 xlib::XMapWindow(self.display, window);
                 xlib::XMapSubwindows(self.display, window);
             }
+
+            self.current_desktop = index;
         }
-        self.current_desktop = index;
+
+        self.draw_bar();
+    }
+
+    fn draw_bar(&self) {
+        unsafe {
+            let root = XDefaultRootWindow(self.display);
+
+            let desktop_str = match CString::new(format!("Desktop {}", self.current_desktop + 1)) {
+                Ok(stri) => stri,
+                Err(e) => {
+                    warn!("failed to create cstring for current desktop number: {}.", e);
+                    return;
+                }
+            };
+
+            let screen = XDefaultScreen(self.display);
+            let mut bar_color: XColor = std::mem::zeroed();
+
+            let hex_str = match CString::new(self.config.desktop.bar_color.clone()) {
+                Ok(hex_str) => hex_str,
+                Err(e) => {
+                    error!("failed to convert bar color str to cstring: {}", e);
+                    return;
+                }
+            };
+
+            if XParseColor(
+                self.display,
+                XDefaultColormap(self.display, screen),
+                hex_str.as_ptr(),
+                &mut bar_color,
+            ) != 1
+            {
+                error!("failed to parse bar color");
+            }
+
+            XAllocColor(
+                self.display,
+                XDefaultColormap(self.display, screen),
+                &mut bar_color,
+            );
+
+            let gcv = XGCValues {
+                foreground: bar_color.pixel,
+                background: 0,
+                font: 0,
+                ..std::mem::zeroed()
+            };
+
+            let gc = xlib::XCreateGC(self.display, root, GCForeground as u64, &gcv as *const _ as *mut _);
+
+            xlib::XClearArea(self.display, root, 0, 0, 200, 100, 0);
+            xlib::XDrawString(self.display, root, gc, 5, 15, desktop_str.as_ptr() as *const i8, desktop_str.to_bytes().len() as i32);
+        }
     }
 
     fn layout(&self) {

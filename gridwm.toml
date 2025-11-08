@@ -12,15 +12,16 @@ acceleration_threshold = 5
 
 [desktop]
 color = "#464646"
+bar_color = "#ff0000"
 
 [keybinds]
 gridwm = [
     ["ALT+SUPER+C", "close"],
     ["SUPER+C", "close"],
-    ["SUPER+RIGHT", "desktop_right"],
-    ["SUPER+LEFT", "desktop_left"]
+    ["ALT+SUPER+RIGHT", "desktop_right"],
+    ["ALT+SUPER+LEFT", "desktop_left"]
 ]
 exec = [
-    ["SUPER+ENTER", "konsole"],
-    ["SUPER+SPACE", "rofi -show drun"]
+    ["ALT+SUPER+ENTER", "konsole"],
+    ["ALT+SUPER+SPACE", "rofi -show drun"]
 ]

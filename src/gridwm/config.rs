@@ -55,12 +55,14 @@ impl Default for Mouse {
 #[serde(default)]
 pub struct Desktop {
     pub color: String,
+    pub bar_color: String
 }
 
 impl Default for Desktop {
     fn default() -> Self {
         Self {
             color: "#464646".to_string(),
+            bar_color: "#ff0000".to_string(),
         }
     }
 }
