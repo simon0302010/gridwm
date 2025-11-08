@@ -10,8 +10,7 @@ use signals::*;
 
 use log::*;
 use std::{
-    collections::BTreeSet, ffi::CString, mem::zeroed, os::unix::process::CommandExt,
-    process::Command, slice,
+    collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice
 };
 use x11::{
     xinerama,
@@ -24,8 +23,9 @@ use x11::{
 
 pub struct GridWM {
     display: *mut xlib::Display,
-    windows: BTreeSet<Window>,
     config: Config,
+    desktops: Vec<BTreeSet<Window>>,
+    current_desktop: usize
 }
 
 pub type Window = u64;
@@ -39,6 +39,8 @@ struct WindowInfo {
 
 impl GridWM {
     pub fn new(display_name: &str) -> Result<Self, GridWMError> {
+        let current_desktop = 0;
+
         let display: *mut xlib::Display =
             unsafe { xlib::XOpenDisplay(CString::new(display_name)?.as_ptr()) };
 
@@ -46,16 +48,16 @@ impl GridWM {
             return Err(GridWMError::DisplayNotFound(display_name.into()));
         }
 
-        // create set to store windows
-        let windows: BTreeSet<u64> = BTreeSet::new();
+        let desktops: Vec<BTreeSet<Window>> = Vec::new();
 
         // load config
         let config = Config::from_file("gridwm.toml")?; // load config here
 
         Ok(GridWM {
             display,
-            windows,
             config,
+            desktops,
+            current_desktop
         })
     }
 
@@ -110,7 +112,7 @@ impl GridWM {
             for bind in self
                 .config
                 .keybinds
-                .window
+                .gridwm
                 .iter()
                 .chain(self.config.keybinds.exec.iter())
             {
@@ -207,13 +209,15 @@ impl GridWM {
                     xlib::MapNotify => {
                         // set focus when window is mapped
                         let map_event: xlib::XMapEvent = From::from(event);
-                        if self.windows.contains(&map_event.window) {
+                        let desktop = self.get_desktop(self.current_desktop);
+                        if desktop.contains(&map_event.window) {
                             xlib::XSetInputFocus(
                                 self.display,
                                 map_event.window,
                                 xlib::RevertToPointerRoot,
                                 xlib::CurrentTime,
                             );
+                            xlib::XRaiseWindow(self.display, map_event.window);
                         }
                         self.layout();
                     }
@@ -231,23 +235,34 @@ impl GridWM {
         }
     }
 
+    fn set_desktop(&mut self, index: usize, value: BTreeSet<Window>) {
+        if self.desktops.len() <= index {
+            self.desktops.resize_with(index + 1, || BTreeSet::new());
+        }
+        self.desktops[index] = value;
+    }
+
+    fn get_desktop(&self, index: usize) -> BTreeSet<Window> {
+        match self.desktops.get(index) {
+            Some(d) => d.clone(),
+            None => BTreeSet::new(),
+        }
+    }
+
     fn create_window(&mut self, event: xlib::XEvent) {
         info!("creating a window");
         let event: xlib::XMapRequestEvent = From::from(event);
         unsafe { xlib::XMapWindow(self.display, event.window) };
-        self.windows.insert(event.window);
+        let mut desktop = self.get_desktop(self.current_desktop);
+        desktop.insert(event.window);
+        self.set_desktop(self.current_desktop, desktop);
     }
 
     fn remove_window(&mut self, event: xlib::XEvent) {
         let event: xlib::XUnmapEvent = From::from(event);
-        match self.windows.remove(&event.window) {
-            true => {
-                info!("closed a window");
-            }
-            false => {
-                warn!("tried removing not existing window")
-            }
-        }
+        let mut desktop = self.get_desktop(self.current_desktop);
+        desktop.remove(&event.window);
+        self.set_desktop(self.current_desktop, desktop);
     }
 
     fn get_screen_size(&self) -> Result<(i16, i16), GridWMError> {
@@ -281,11 +296,12 @@ impl GridWM {
         attrs
     }
 
-    fn handle_key(&self, event: xlib::XEvent) {
+    fn handle_key(&mut self, event: xlib::XEvent) {
         let event: xlib::XKeyPressedEvent = From::from(event);
 
         // check keybindings and execute
-        for bind in &self.config.keybinds.window {
+        let gridwm_binds = self.config.keybinds.gridwm.clone();
+        for bind in &gridwm_binds {
             if bind.len() != 2 {
                 error!("failed to parse keybind {:?}: invalid length.", bind);
                 continue;
@@ -315,13 +331,20 @@ impl GridWM {
                             }
                         }
                     }
+                    "desktop_right" => {
+                        self.change_desktop(self.current_desktop + 1);
+                    }
+                    "desktop_left" => {
+                        self.change_desktop(if self.current_desktop > 0 { self.current_desktop - 1 } else { 0 });
+                    }
                     _ => {}
                 }
             }
         }
 
         // check keybindings for commands and execute
-        for bind in &self.config.keybinds.exec {
+        let exec_binds = self.config.keybinds.exec.clone();
+        for bind in &exec_binds {
             if bind.len() != 2 {
                 error!("failed to parse keybind {:?}: invalid length.", bind);
                 continue;
@@ -375,8 +398,25 @@ impl GridWM {
         }
     }
 
+    fn change_desktop(&mut self, index: usize) {
+        unsafe {
+            let root = XDefaultRootWindow(self.display);
+
+            for window in self.get_desktop(self.current_desktop) {
+                xlib::XUnmapWindow(self.display, window);
+                xlib::XUnmapSubwindows(self.display, window);
+            }
+            for window in self.get_desktop(index) {
+                xlib::XMapWindow(self.display, window);
+                xlib::XMapSubwindows(self.display, window);
+            }
+        }
+        self.current_desktop = index;
+    }
+
     fn layout(&self) {
-        let tileable: Vec<Window> = self.windows
+        let desktop = self.get_desktop(self.current_desktop);
+        let tileable: Vec<Window> = desktop
             .iter()
             .copied()
             .filter(|&w| self.is_tileable(w))
@@ -431,6 +471,16 @@ impl GridWM {
                 b"_NET_WM_WINDOW_TYPE_DOCK\0".as_ptr() as *const i8,
                 0,
             );
+            let dialog_type = xlib::XInternAtom(
+                self.display,
+                b"_NET_WM_WINDOW_TYPE_DIALOG\0".as_ptr() as *const i8,
+                0,
+            );
+            let splash_type = xlib::XInternAtom(
+                self.display,
+                b"_NET_WM_WINDOW_TYPE_SPLASH\0".as_ptr() as *const i8,
+                0,
+            );
 
             let mut actual_type: xlib::Atom = 0;
             let mut actual_format: i32 = 0;
@@ -439,14 +489,16 @@ impl GridWM {
             let mut prop: *mut u8 = std::ptr::null_mut();
 
             if xlib::XGetWindowProperty(
-                self.display, 
-                window, 
-                window_type, 
-                0, 1, 0, 
-                xlib::XA_ATOM, 
-                &mut actual_type, 
-                &mut actual_format, 
-                &mut nitems, 
+                self.display,
+                window,
+                window_type,
+                0,
+                1,
+                0,
+                xlib::XA_ATOM,
+                &mut actual_type,
+                &mut actual_format,
+                &mut nitems,
                 &mut bytes_after,
                 &mut prop,
             ) == 0
@@ -454,7 +506,10 @@ impl GridWM {
             {
                 let wtype = *(prop as *const xlib::Atom);
                 libc::free(prop as *mut _);
-                return wtype != notification_type && wtype != dock_type;
+                return wtype != notification_type
+                    && wtype != dock_type
+                    && wtype != dialog_type
+                    && wtype != splash_type;
             }
             true
         }

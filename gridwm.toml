@@ -14,9 +14,11 @@ acceleration_threshold = 5
 color = "#464646"
 
 [keybinds]
-window = [
+gridwm = [
     ["ALT+SUPER+C", "close"],
-    ["SUPER+C", "close"]
+    ["SUPER+C", "close"],
+    ["SUPER+RIGHT", "desktop_right"],
+    ["SUPER+LEFT", "desktop_left"]
 ]
 exec = [
     ["SUPER+ENTER", "konsole"],

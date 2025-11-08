@@ -25,6 +25,10 @@ pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, 
                 "SPACE" => x11::keysym::XK_space,
                 "TAB" => x11::keysym::XK_Tab,
                 "ENTER" => x11::keysym::XK_Return,
+                "RIGHT" => x11::keysym::XK_Right,
+                "LEFT" => x11::keysym::XK_Left,
+                "UP" => x11::keysym::XK_Up,
+                "DOWN" => x11::keysym::XK_Down,
                 _ => return None,
             }
         };
