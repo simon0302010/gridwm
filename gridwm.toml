@@ -17,6 +17,7 @@ color = "#464646"
 text_color = "#ffffff"
 background_color = "#000000"
 height = 20
+enable = true
 
 [keybinds]
 gridwm = [

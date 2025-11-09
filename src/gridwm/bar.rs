@@ -1,4 +1,4 @@
-use chrono::{Datelike, Timelike, TimeZone};
+use chrono::{Datelike, Timelike};
 
 pub fn time_widget() -> String {
     let now = chrono::offset::Local::now();

@@ -192,7 +192,9 @@ impl GridWM {
             XFlush(self.display);
 
             // draw bar for the first time yahooooo
-            self.draw_bar();
+            if self.config.bar.enable {
+                self.draw_bar();
+            }
         }
         Ok(())
     }
@@ -265,7 +267,7 @@ impl GridWM {
                 }
             }
 
-            if let Ok(_) = timer_rx.try_recv() {
+            if let Ok(_) = timer_rx.try_recv() && self.config.bar.enable {
                 self.draw_bar();
             }
         }
@@ -454,8 +456,10 @@ impl GridWM {
 
             self.current_desktop = index;
         }
-
-        self.draw_bar();
+        
+        if self.config.bar.enable {
+            self.draw_bar();
+        }
     }
 
     fn draw_bar(&self) {
@@ -602,30 +606,46 @@ impl GridWM {
             }
         }
 
-        self.draw_bar();
+        if self.config.bar.enable {
+            self.draw_bar();
+        }
     }
 
     fn tile(&self, n: usize, screen_w: i32, screen_h: i32) -> Vec<WindowInfo> {
         let cols = (n as f32).sqrt().ceil() as i32;
         let rows = ((n as i32 + cols - 1) / cols) as i32;
         let w = screen_w / cols;
-        let h = (screen_h
-            - if screen_h < self.config.bar.height as i32 {
-                0
-            } else {
-                self.config.bar.height as i32
-            })
-            / rows;
+        let mut h = screen_h / rows;
+        if self.config.bar.enable {
+            h = (screen_h
+                - if screen_h < self.config.bar.height as i32 {
+                    0
+                } else {
+                    self.config.bar.height as i32
+                })
+                / rows;
+        }
+
 
         (0..n)
             .map(|i| {
                 let i = i as i32;
-                WindowInfo {
-                    x: (i % cols) * w,
-                    y: ((i / cols) * h) + self.config.bar.height as i32,
-                    w,
-                    h,
+                if self.config.bar.enable {
+                    WindowInfo {
+                        x: (i % cols) * w,
+                        y: ((i / cols) * h) + self.config.bar.height as i32,
+                        w,
+                        h,
+                    }
+                } else {
+                    WindowInfo {
+                        x: (i % cols) * w,
+                        y: (i / cols) * h,
+                        w,
+                        h,
+                    }
                 }
+
             })
             .collect()
     }
