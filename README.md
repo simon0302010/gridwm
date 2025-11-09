@@ -54,10 +54,11 @@ GridWM is a tiling X11 based window manager for Linux. This project is still in 
 
 ## Usage
 
-To start GridWM, you can use the `startx` command from tty:
+To start GridWM, add the binary to `~/.xinitrc` and run `startx` from tty:
 
 ```bash
-startx path/to/gridwm
+echo "path/to/gridwm" > ~/.xinitrc
+startx
 ```
 
 ## Contributing
