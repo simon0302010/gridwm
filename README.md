@@ -61,9 +61,16 @@ https://github.com/user-attachments/assets/cb0c99de-f742-4768-86b3-7a5043a1eec7
 To start GridWM, add the binary to `~/.xinitrc` and run `startx` from tty:
 
 ```bash
-echo "path/to/gridwm" > ~/.xinitrc
+echo "exec path/to/gridwm" > ~/.xinitrc
 startx
 ```
+> WARNING: This overrides your existing .xinitrc file.
+
+You can also run
+```bash
+startx path/to/gridwm
+```
+if you don't want your existing X configuration to be overwritten.
 
 ## Contributing
 
