@@ -20,12 +20,11 @@ height = 20
 
 [keybinds]
 gridwm = [
-    ["ALT+SUPER+C", "close"],
     ["SUPER+C", "close"],
-    ["ALT+SUPER+RIGHT", "desktop_right"],
-    ["ALT+SUPER+LEFT", "desktop_left"]
+    ["SUPER+RIGHT", "desktop_right"],
+    ["SUPER+LEFT", "desktop_left"]
 ]
 exec = [
-    ["ALT+SUPER+ENTER", "konsole"],
-    ["ALT+SUPER+SPACE", "rofi -show drun"]
+    ["SUPER+ENTER", "konsole"],
+    ["SUPER+SPACE", "rofi -show drun"]
 ]

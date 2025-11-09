@@ -120,8 +120,14 @@ impl RatioF64 {
 // functions for config
 impl Config {
     pub fn from_file(path: &str) -> Result<Self, GridWMError> {
-        let s = fs::read_to_string(path)?;
-        let cfg: Config = toml::from_str(&s)?;
-        Ok(cfg)
+        match fs::read_to_string(path) {
+            Ok(s) => {
+                let cfg: Config = toml::from_str(&s)?;
+                Ok(cfg)
+            }
+            Err(_) => {
+                Ok(Config::default())
+            }
+        }
     }
 }

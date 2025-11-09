@@ -54,7 +54,15 @@ impl GridWM {
         let desktops: Vec<BTreeSet<Window>> = Vec::new();
 
         // load config
-        let config = Config::from_file("gridwm.toml")?; // load config here
+        let config_path = dirs::config_dir()
+            .map(|mut p| { p.push("gridwm/gridwm.toml"); p })
+            .filter(|p| p.exists())
+            .map(|p| p.to_str().unwrap_or("").to_string())
+            .unwrap_or_else(|| {
+            warn!("config file not found, using default");
+            "".to_string()
+            });
+        let config = Config::from_file(&config_path)?;
 
         Ok(GridWM {
             display,
