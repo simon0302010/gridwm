@@ -2,11 +2,13 @@ mod config;
 mod error;
 mod keybinds;
 mod signals;
+mod bar;
 
 use config::Config;
 use error::*;
 use keybinds::*;
 use signals::*;
+use bar::*;
 
 use log::*;
 use std::{
@@ -215,40 +217,42 @@ impl GridWM {
         let mut event: xlib::XEvent = unsafe { zeroed() };
 
         loop {
-            unsafe {
-                xlib::XNextEvent(self.display, &mut event);
+            while unsafe { xlib::XPending(self.display) } > 0 {
+                unsafe {
+                    xlib::XNextEvent(self.display, &mut event);
 
-                match event.get_type() {
-                    xlib::MapRequest => {
-                        self.create_window(event);
-                    }
-                    xlib::UnmapNotify => {
-                        self.remove_window(event);
-                        self.layout();
-                    }
-                    xlib::MapNotify => {
-                        // set focus when window is mapped
-                        let map_event: xlib::XMapEvent = From::from(event);
-                        let desktop = self.get_desktop(self.current_desktop);
-                        if desktop.contains(&map_event.window) {
-                            xlib::XSetInputFocus(
-                                self.display,
-                                map_event.window,
-                                xlib::RevertToPointerRoot,
-                                xlib::CurrentTime,
-                            );
-                            xlib::XRaiseWindow(self.display, map_event.window);
+                    match event.get_type() {
+                        xlib::MapRequest => {
+                            self.create_window(event);
                         }
-                        self.layout();
-                    }
-                    xlib::KeyPress => {
-                        self.handle_key(event);
-                    }
-                    xlib::ButtonPress => {
-                        self.handle_button(event);
-                    }
-                    _ => {
-                        // debug!("event triggered: {:?}", event);
+                        xlib::UnmapNotify => {
+                            self.remove_window(event);
+                            self.layout();
+                        }
+                        xlib::MapNotify => {
+                            // set focus when window is mapped
+                            let map_event: xlib::XMapEvent = From::from(event);
+                            let desktop = self.get_desktop(self.current_desktop);
+                            if desktop.contains(&map_event.window) {
+                                xlib::XSetInputFocus(
+                                    self.display,
+                                    map_event.window,
+                                    xlib::RevertToPointerRoot,
+                                    xlib::CurrentTime,
+                                );
+                                xlib::XRaiseWindow(self.display, map_event.window);
+                            }
+                            self.layout();
+                        }
+                        xlib::KeyPress => {
+                            self.handle_key(event);
+                        }
+                        xlib::ButtonPress => {
+                            self.handle_button(event);
+                        }
+                        _ => {
+                            // debug!("event triggered: {:?}", event);
+                        }
                     }
                 }
             }
@@ -450,7 +454,7 @@ impl GridWM {
         unsafe {
             let root = XDefaultRootWindow(self.display);
 
-            let desktop_str = match CString::new(format!("Desktop {}", self.current_desktop + 1)) {
+            let bar_str = match CString::new(format!("Desktop {} | {}", self.current_desktop + 1, time_widget())) {
                 Ok(stri) => stri,
                 Err(e) => {
                     warn!(
@@ -564,8 +568,8 @@ impl GridWM {
                 bar_gc,
                 5,
                 15,
-                desktop_str.as_ptr() as *const i8,
-                desktop_str.to_bytes().len() as i32,
+                bar_str.as_ptr() as *const i8,
+                bar_str.to_bytes().len() as i32,
             );
         }
     }
