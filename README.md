@@ -3,6 +3,10 @@
 GridWM is a tiling X11 based window manager for Linux. This project is still in its early stages of development and lacks many features.
 > ⚠️ This project does not support Windows or macOS.
 
+## Demo
+
+https://github.com/user-attachments/assets/cb0c99de-f742-4768-86b3-7a5043a1eec7
+
 ## Features
 
 - Basic tiling window management
