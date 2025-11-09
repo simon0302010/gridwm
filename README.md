@@ -46,4 +46,24 @@ GridWM is a tiling X11 based window manager for Linux. This project is still in 
     ```bash
     cargo install --git https://github.com/simon0302010/gridwm.git
     ```
-    > ⚠️ Make sure you have Rust and Cargo installed on your system and added `~/.cargo/bin` added to your PATH before running the above command.
+    > Make sure you have Rust and Cargo installed on your system and added `~/.cargo/bin` added to your PATH before running the above command.
+
+3. Create Configuration File
+    You can look at the [CONFIGURATION.md](CONFIGURATION.md) file for details on how to create a configuration file for GridWM. The configuration file should be located at `~/.config/gridwm/gridwm.toml`.
+    > If the configuration file or any options are missing, GridWM will use default settings.
+
+## Usage
+
+To start GridWM, you can use the `startx` command from tty:
+
+```bash
+startx path/to/gridwm
+```
+
+## Contributing
+
+If you are interested in a specific feature or want to report a bug, feel free to create a GitHub issue. Pull requests are also welcome.
+
+## License
+
+This project is licensed under the GNU General Public License Version 3. See the [LICENSE](LICENSE) file for details.
