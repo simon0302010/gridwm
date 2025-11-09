@@ -267,7 +267,7 @@ impl GridWM {
                 }
             }
 
-            if let Ok(_) = timer_rx.try_recv() && self.config.bar.enable {
+            if timer_rx.try_recv().is_ok() && self.config.bar.enable {
                 self.draw_bar();
             }
         }

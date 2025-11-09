@@ -28,7 +28,7 @@ GridWM is a tiling X11 based window manager for Linux. This project is still in 
    Debian based systems:
 
    ```bash
-   sudo apt install xserver-xorg xinit x11-xserver-utils xorg-setxkbmap xorg
+   sudo apt install xserver-xorg xinit x11-xserver-utils x11-xkb-utils xorg pkg-config libx11-dev libxinerama-dev
    ```
 
    Arch based systems:
