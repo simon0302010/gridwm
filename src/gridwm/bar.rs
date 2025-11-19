@@ -37,3 +37,13 @@ pub fn cpu_widget() -> String {
 
     format!("CPU: {}%", avg)
 }
+
+pub fn mem_widget() -> String {
+    let mut sys = System::new();
+    sys.refresh_memory();
+
+    let total = sys.total_memory() as f64  / 1024.0 / 1024.0 / 1024.0;
+    let used = sys.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
+
+    format!("Memory: {:.1}/{:.1} GiB", used, total)
+}
