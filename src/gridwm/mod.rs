@@ -193,7 +193,7 @@ impl GridWM {
 
             // draw bar for the first time yahooooo
             if self.config.bar.enable {
-                self.draw_bar();
+                self.draw_bar(None);
             }
         }
         Ok(())
@@ -269,7 +269,7 @@ impl GridWM {
             }
 
             if timer_rx.try_recv().is_ok() && self.config.bar.enable {
-                self.draw_bar();
+                self.draw_bar(None);
             }
         }
     }
@@ -459,17 +459,22 @@ impl GridWM {
         }
         
         if self.config.bar.enable {
-            self.draw_bar();
+            self.draw_bar(None);
         }
     }
 
-    fn draw_bar(&self) {
+    fn draw_bar(&self, content: Option<String>) {
         unsafe {
             let root = XDefaultRootWindow(self.display);
 
-            let bar_str = CString::new(
+            let mut bar_str = CString::new(
                 get_widgets(&self.config.bar.widgets, &self.current_desktop)
             );
+
+            if let Some(text) = content {
+                bar_str = CString::new(text);
+            }
+
             let bar_str = match bar_str {
                 Ok(stri) => stri,
                 Err(e) => {
@@ -611,7 +616,7 @@ impl GridWM {
         }
 
         if self.config.bar.enable {
-            self.draw_bar();
+            self.draw_bar(None);
         }
     }
 
