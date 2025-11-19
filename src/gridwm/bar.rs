@@ -1,6 +1,7 @@
 use chrono::{Datelike, Timelike};
 use std::thread::sleep;
 use sysinfo::{MINIMUM_CPU_UPDATE_INTERVAL, System};
+use log::warn;
 
 pub fn time_widget() -> String {
     let now = chrono::offset::Local::now();
@@ -46,4 +47,28 @@ pub fn mem_widget() -> String {
     let used = sys.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
 
     format!("Memory: {:.1}/{:.1} GiB", used, total)
+}
+
+pub fn desktop_widget(num: usize) -> String {
+    format!("Desktop {}", num + 1)
+}
+
+pub fn get_widgets(widgets: &Vec<String>, desktop_num: &usize) -> String {
+    let mut data: Vec<String> = Vec::new();
+    for widget in widgets {
+        data.push(
+            match widget.as_str() {
+                "desktop" => desktop_widget(*desktop_num),
+                "time" => time_widget(),
+                "cpu" => cpu_widget(),
+                "mem" => mem_widget(),
+                other => {
+                    warn!("no widget \"{}\" found", other);
+                    continue;
+                }
+            }
+        );
+    }
+
+    data.join(" | ")
 }

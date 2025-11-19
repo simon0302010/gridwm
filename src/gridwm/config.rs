@@ -72,7 +72,8 @@ pub struct Bar {
     pub background_color: String,
     pub height: u32,
     pub enable: bool,
-    pub update: f32
+    pub update: f32,
+    pub widgets: Vec<String>
 }
 
 impl Default for Bar {
@@ -82,7 +83,8 @@ impl Default for Bar {
             background_color: "#000000".into(),
             height: 20,
             enable: true,
-            update: 1.0
+            update: 1.0,
+            widgets: vec!["desktop".to_owned()]
         }
     }
 }

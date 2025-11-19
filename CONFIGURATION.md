@@ -10,7 +10,7 @@ Executed programs on WM startup.
 - **`exec`** (array of strings): List of commands to run when GridWM starts.
   ```toml
   [start]
-  exec = ["picom", "polybar"]
+  exec = ["picom", "kitty"]
   ```
 
 ### `[keyboard]`
@@ -53,12 +53,16 @@ Status bar appearance settings.
 - **`background_color`** (string): Bar background color in hex format (e.g., `"#272727"`).
 - **`height`** (integer): Height of the status bar in pixels (default: `20`).
 - **`enable`** (boolean): Enable or disable the status bar.
+- **`update`** (number): Update interval for widgets on the bar.
+- **`widgets`** (array of strings): Which widgets to enable. (desktop, time, cpu, mem)
   ```toml
   [bar]
   text_color = "#ffffff"
   background_color = "#272727"
   height = 20
   enable = true
+  update = 2.0
+  widgets = ["desktop", "time", "cpu", "mem"]
   ```
 
 ### `[keybinds]` (gridwm keybinds)
@@ -110,6 +114,9 @@ color = "#464646"
 text_color = "#ffffff"
 background_color = "#272727"
 height = 20
+update = 2.0
+enable = true
+widgets = ["desktop", "time", "cpu", "mem"]
 
 [[keybinds.gridwm]]
 gridwm = [
