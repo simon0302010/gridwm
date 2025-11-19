@@ -54,7 +54,7 @@ Status bar appearance settings.
 - **`height`** (integer): Height of the status bar in pixels (default: `20`).
 - **`enable`** (boolean): Enable or disable the status bar.
 - **`update`** (number): Update interval for widgets on the bar.
-- **`widgets`** (array of strings): Which widgets to enable. (desktop, time, cpu, mem)
+- **`widgets`** (array of strings): Which widgets to enable. (desktop, time, cpu, mem, battery)
   ```toml
   [bar]
   text_color = "#ffffff"
@@ -62,7 +62,7 @@ Status bar appearance settings.
   height = 20
   enable = true
   update = 2.0
-  widgets = ["desktop", "time", "cpu", "mem"]
+  widgets = ["desktop", "time", "cpu", "mem", "battery"]
   ```
 
 ### `[keybinds]` (gridwm keybinds)

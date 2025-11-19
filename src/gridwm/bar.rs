@@ -1,7 +1,7 @@
 use chrono::{Datelike, Timelike};
 use std::thread::sleep;
 use sysinfo::{MINIMUM_CPU_UPDATE_INTERVAL, System};
-use log::warn;
+use log::{warn, error};
 
 pub fn time_widget() -> String {
     let now = chrono::offset::Local::now();
@@ -53,6 +53,39 @@ pub fn desktop_widget(num: usize) -> String {
     format!("Desktop {}", num + 1)
 }
 
+pub fn battery_widget() -> String {
+    let manager = match battery::Manager::new() {
+        Ok(m) => m,
+        Err(e) => {
+            error!("failed to create battery manager: {}", e);
+            return "Error".to_string();
+        }
+    };
+
+    let batteries = match manager.batteries() {
+        Ok(bat) => bat,
+        Err(e) => {
+            error!("failed to get list of batteries: {}", e);
+            return "Error".to_string();
+        }
+    };
+
+    let mut data: Vec<String> = Vec::new();
+    for (idx, maybe_battery) in batteries.enumerate() {
+        let battery = match maybe_battery {
+            Ok(bat) => bat,
+            Err(e) => {
+                warn!("failed to get info for battery #{}", e);
+                continue;
+            }
+        };
+
+        data.push(format!("BAT {}: {:.0}%", idx + 1, battery.state_of_charge().value * 100.0));
+    }
+
+    data.join(", ")
+}
+
 pub fn get_widgets(widgets: &Vec<String>, desktop_num: &usize) -> String {
     let mut data: Vec<String> = Vec::new();
     for widget in widgets {
@@ -62,6 +95,7 @@ pub fn get_widgets(widgets: &Vec<String>, desktop_num: &usize) -> String {
                 "time" => time_widget(),
                 "cpu" => cpu_widget(),
                 "mem" => mem_widget(),
+                "battery" => battery_widget(),
                 other => {
                     warn!("no widget \"{}\" found", other);
                     continue;
