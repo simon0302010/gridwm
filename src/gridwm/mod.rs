@@ -466,7 +466,7 @@ impl GridWM {
         unsafe {
             let root = XDefaultRootWindow(self.display);
 
-            let bar_str = match CString::new(format!("Desktop {} | {}", self.current_desktop + 1, time_widget())) {
+            let bar_str = match CString::new(format!("Desktop {} | {} | {}", self.current_desktop + 1, time_widget(), cpu_widget())) {
                 Ok(stri) => stri,
                 Err(e) => {
                     warn!(

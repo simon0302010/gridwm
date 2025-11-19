@@ -77,8 +77,8 @@ pub struct Bar {
 impl Default for Bar {
     fn default() -> Self {
         Self {
-            text_color: "#ff0000".into(),
-            background_color: "#272727".into(),
+            text_color: "#ffffff".into(),
+            background_color: "#000000".into(),
             height: 20,
             enable: true
         }
