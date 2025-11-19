@@ -216,10 +216,11 @@ impl GridWM {
         }
 
         let (timer_tx, timer_rx) = mpsc::channel();
+        let bar_update = self.config.bar.update;
 
         thread::spawn(move || {
             loop {
-                thread::sleep(Duration::from_secs(1));
+                thread::sleep(Duration::from_millis((bar_update * 1000.0) as u64));
                 timer_tx.send(()).ok();
             }
         });

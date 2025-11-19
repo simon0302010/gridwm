@@ -71,7 +71,8 @@ pub struct Bar {
     pub text_color: String,
     pub background_color: String,
     pub height: u32,
-    pub enable: bool
+    pub enable: bool,
+    pub update: f32
 }
 
 impl Default for Bar {
@@ -80,7 +81,8 @@ impl Default for Bar {
             text_color: "#ffffff".into(),
             background_color: "#000000".into(),
             height: 20,
-            enable: true
+            enable: true,
+            update: 1.0
         }
     }
 }

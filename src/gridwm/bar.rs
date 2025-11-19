@@ -34,5 +34,6 @@ pub fn cpu_widget() -> String {
     } else {
         0
     };
+
     format!("CPU: {}%", avg)
 }
