@@ -1,7 +1,7 @@
 use chrono::{Datelike, Timelike};
+use log::{error, warn};
 use std::thread::sleep;
 use sysinfo::{MINIMUM_CPU_UPDATE_INTERVAL, System};
-use log::{warn, error};
 
 pub fn time_widget() -> String {
     let now = chrono::offset::Local::now();
@@ -43,7 +43,7 @@ pub fn mem_widget() -> String {
     let mut sys = System::new();
     sys.refresh_memory();
 
-    let total = sys.total_memory() as f64  / 1024.0 / 1024.0 / 1024.0;
+    let total = sys.total_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
     let used = sys.used_memory() as f64 / 1024.0 / 1024.0 / 1024.0;
 
     format!("Memory: {:.1}/{:.1} GiB", used, total)
@@ -80,28 +80,34 @@ pub fn battery_widget() -> String {
             }
         };
 
-        data.push(format!("BAT {}: {:.0}%", idx + 1, battery.state_of_charge().value * 100.0));
+        data.push(format!(
+            "BAT {}: {:.0}%",
+            idx + 1,
+            battery.state_of_charge().value * 100.0
+        ));
     }
 
-    data.join(", ")
+    if !data.is_empty() {
+        data.join(", ")
+    } else {
+        "No batteries found".to_string()
+    }
 }
 
 pub fn get_widgets(widgets: &Vec<String>, desktop_num: &usize) -> String {
     let mut data: Vec<String> = Vec::new();
     for widget in widgets {
-        data.push(
-            match widget.as_str() {
-                "desktop" => desktop_widget(*desktop_num),
-                "time" => time_widget(),
-                "cpu" => cpu_widget(),
-                "mem" => mem_widget(),
-                "battery" => battery_widget(),
-                other => {
-                    warn!("no widget \"{}\" found", other);
-                    continue;
-                }
+        data.push(match widget.as_str() {
+            "desktop" => desktop_widget(*desktop_num),
+            "time" => time_widget(),
+            "cpu" => cpu_widget(),
+            "mem" => mem_widget(),
+            "battery" => battery_widget(),
+            other => {
+                warn!("no widget \"{}\" found", other);
+                continue;
             }
-        );
+        });
     }
 
     data.join(" | ")

@@ -1,14 +1,14 @@
+mod bar;
 mod config;
 mod error;
 mod keybinds;
 mod signals;
-mod bar;
 
+use bar::*;
 use config::Config;
 use error::*;
 use keybinds::*;
 use signals::*;
-use bar::*;
 
 use log::*;
 use std::{
@@ -55,12 +55,15 @@ impl GridWM {
 
         // load config
         let config_path = dirs::config_dir()
-            .map(|mut p| { p.push("gridwm/gridwm.toml"); p })
+            .map(|mut p| {
+                p.push("gridwm/gridwm.toml");
+                p
+            })
             .filter(|p| p.exists())
             .map(|p| p.to_str().unwrap_or("").to_string())
             .unwrap_or_else(|| {
-            warn!("config file not found, using default");
-            "".to_string()
+                warn!("config file not found, using default");
+                "".to_string()
             });
         let config = Config::from_file(&config_path)?;
 
@@ -210,18 +213,31 @@ impl GridWM {
                     let _ = Command::new(program).args(args).spawn();
                 }
                 Err(e) => {
-                    error!("Failed to parse start job '{}': {}", start_job, e);
+                    error!("failed to parse start job '{}': {}", start_job, e);
                 }
             }
         }
 
         let (timer_tx, timer_rx) = mpsc::channel();
+        let (data_req_tx, data_req_rx) = mpsc::channel();
+        let (data_resp_tx, data_resp_rx) = mpsc::channel();
+
         let bar_update = self.config.bar.update;
 
         thread::spawn(move || {
             loop {
                 thread::sleep(Duration::from_millis((bar_update * 1000.0) as u64));
-                timer_tx.send(()).ok();
+                let _ = data_req_tx.send("BAR");
+                // Will freeze if "BAR" isn't sent
+                let (widgets, current_desktop) = match data_resp_rx.recv() {
+                    Ok(data) => data,
+                    Err(e) => {
+                        warn!("error occured in bar management thread: {}", e);
+                        continue;
+                    }
+                };
+                let data = get_widgets(&widgets, &current_desktop);
+                timer_tx.send(data).ok();
             }
         });
 
@@ -268,8 +284,20 @@ impl GridWM {
                 }
             }
 
-            if timer_rx.try_recv().is_ok() && self.config.bar.enable {
-                self.draw_bar(None);
+            if let Ok(bar_content) = timer_rx.try_recv()
+                && self.config.bar.enable
+            {
+                self.draw_bar(Some(bar_content));
+            }
+
+            if let Ok(data_req) = data_req_rx.try_recv() {
+                if data_req == "BAR" {
+                    let payload = (
+                        self.config.bar.widgets.clone(),
+                        self.current_desktop.clone(),
+                    );
+                    let _ = data_resp_tx.send(payload);
+                }
             }
         }
     }
@@ -457,7 +485,7 @@ impl GridWM {
 
             self.current_desktop = index;
         }
-        
+
         if self.config.bar.enable {
             self.draw_bar(None);
         }
@@ -467,9 +495,8 @@ impl GridWM {
         unsafe {
             let root = XDefaultRootWindow(self.display);
 
-            let mut bar_str = CString::new(
-                get_widgets(&self.config.bar.widgets, &self.current_desktop)
-            );
+            let mut bar_str =
+                CString::new(get_widgets(&self.config.bar.widgets, &self.current_desktop));
 
             if let Some(text) = content {
                 bar_str = CString::new(text);
@@ -635,7 +662,6 @@ impl GridWM {
                 / rows;
         }
 
-
         (0..n)
             .map(|i| {
                 let i = i as i32;
@@ -654,7 +680,6 @@ impl GridWM {
                         h,
                     }
                 }
-
             })
             .collect()
     }

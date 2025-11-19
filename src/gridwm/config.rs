@@ -73,7 +73,7 @@ pub struct Bar {
     pub height: u32,
     pub enable: bool,
     pub update: f32,
-    pub widgets: Vec<String>
+    pub widgets: Vec<String>,
 }
 
 impl Default for Bar {
@@ -84,7 +84,7 @@ impl Default for Bar {
             height: 20,
             enable: true,
             update: 1.0,
-            widgets: vec!["desktop".to_owned()]
+            widgets: vec!["desktop".to_owned()],
         }
     }
 }
@@ -131,9 +131,7 @@ impl Config {
                 let cfg: Config = toml::from_str(&s)?;
                 Ok(cfg)
             }
-            Err(_) => {
-                Ok(Config::default())
-            }
+            Err(_) => Ok(Config::default()),
         }
     }
 }
