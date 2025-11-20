@@ -158,6 +158,9 @@ impl GridWM {
                 let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone())
                 {
                     Some((a, Some(b))) => (a, b),
+                    Some((_, None)) => {
+                        continue;
+                    }
                     _ => {
                         warn!("failed to parse keybind: {:?}", bind);
                         continue;
@@ -191,19 +194,21 @@ impl GridWM {
 
             // TODO: this needs some improvement
             if let Some((mask, _button_code)) = parse_keybind(self.display, move_keybind) {
-                xlib::XGrabButton(
-                    self.display,
-                    xlib::Button1,
-                    mask,
-                    root,
-                    1,
-                    (xlib::ButtonPressMask | xlib::ButtonReleaseMask | xlib::Button1MotionMask)
-                        as u32,
-                    xlib::GrabModeAsync,
-                    xlib::GrabModeAsync,
-                    0,
-                    0,
-                );
+                for &extra_mod in &EXTRA_MODS {
+                    xlib::XGrabButton(
+                        self.display,
+                        xlib::Button1,
+                        mask | extra_mod,
+                        root,
+                        1,
+                        (xlib::ButtonPressMask | xlib::ButtonReleaseMask | xlib::Button1MotionMask)
+                            as u32,
+                        xlib::GrabModeAsync,
+                        xlib::GrabModeAsync,
+                        0,
+                        0,
+                    );
+                }
             }
 
             xlib::XGrabButton(
@@ -349,13 +354,15 @@ impl GridWM {
                             }
                         }
                         xlib::MotionNotify => {
-                            let motion_event: xlib::XMotionEvent = From::from(event);
                             while xlib::XCheckTypedEvent(
                                 self.display,
                                 xlib::MotionNotify,
                                 &mut event,
                             ) > 0
                             {}
+
+                            let motion_event: xlib::XMotionEvent = From::from(event);
+
                             self.handle_motion(motion_event);
                         }
                         xlib::ButtonRelease => {
@@ -533,18 +540,53 @@ impl GridWM {
         }
     }
 
+    fn get_toplevel(&self, mut window: Window) -> Window {
+        unsafe {
+            loop {
+                let mut root: xlib::Window = 0;
+                let mut parent: xlib::Window = 0;
+                let mut children: *mut xlib::Window = std::ptr::null_mut();
+                let mut nchildren: u32 = 0;
+                let _ = xlib::XQueryTree(
+                    self.display,
+                    window,
+                    &mut root,
+                    &mut parent,
+                    &mut children,
+                    &mut nchildren,
+                );
+                if !children.is_null() {
+                    // free children list
+                    xlib::XFree(children as *mut _);
+                }
+                if parent == 0 || parent == root {
+                    break;
+                }
+                window = parent;
+            }
+            window
+        }
+    }
+
     fn handle_button(&self, event: xlib::XEvent) {
         let event: XButtonPressedEvent = From::from(event);
 
-        if event.subwindow != 0 {
+        // get toplevel window if child was clicked
+        let clicked_win = if event.subwindow != 0 {
+            self.get_toplevel(event.subwindow)
+        } else {
+            event.subwindow
+        };
+
+        if clicked_win != 0 {
             unsafe {
                 xlib::XSetInputFocus(
                     self.display,
-                    event.subwindow,
+                    clicked_win,
                     xlib::RevertToPointerRoot,
                     xlib::CurrentTime,
                 );
-                xlib::XRaiseWindow(self.display, event.subwindow);
+                xlib::XRaiseWindow(self.display, clicked_win);
                 XFlush(self.display);
             }
         }
@@ -825,7 +867,7 @@ impl GridWM {
                 && nitems > 0
             {
                 let wtype = *(prop as *const xlib::Atom);
-                libc::free(prop as *mut _);
+                xlib::XFree(prop as *mut _);
                 return wtype != notification_type
                     && wtype != dock_type
                     && wtype != dialog_type
@@ -877,12 +919,18 @@ impl GridWM {
             return;
         }
 
-        self.floating_windows.insert(event.subwindow);
+        // use toplevel window instead of child subwindow
+        let win = self.get_toplevel(event.subwindow);
 
-        let attr = self.get_window_attributes(event.subwindow);
+        // TODO: remove later
+        self.floating_windows.insert(win);
+
+        self.layout();
+
+        let attr = self.get_window_attributes(win);
 
         self.drag_state = Some(DragState {
-            window: event.subwindow,
+            window: win,
             start_win_x: attr.x,
             start_win_y: attr.y,
             start_mouse_x: event.x_root,
@@ -890,7 +938,24 @@ impl GridWM {
         });
 
         unsafe {
-            xlib::XRaiseWindow(self.display, event.subwindow);
+            // focus toplevel window
+            xlib::XSetInputFocus(self.display, win, xlib::RevertToPointerRoot, xlib::CurrentTime);
+            xlib::XRaiseWindow(self.display, win);
+
+            // grab pointer
+            let root = XDefaultRootWindow(self.display);
+            xlib::XGrabPointer(
+                self.display,
+                root,
+                0, // owner_events false — handle events in WM
+                (xlib::Button1MotionMask | xlib::ButtonReleaseMask) as u32,
+                xlib::GrabModeAsync,
+                xlib::GrabModeAsync,
+                0,
+                0,
+                xlib::CurrentTime,
+            );
+
             // replay pointer
             xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
         }
@@ -909,6 +974,11 @@ impl GridWM {
     }
 
     fn handle_release(&mut self, _event: xlib::XButtonEvent) {
+        unsafe {
+            xlib::XUngrabPointer(self.display, xlib::CurrentTime);
+            // make sure pointer events are not blocked
+            xlib::XAllowEvents(self.display, xlib::AsyncPointer, xlib::CurrentTime);
+        }
         self.drag_state = None;
     }
 }
