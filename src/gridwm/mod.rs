@@ -92,7 +92,7 @@ impl GridWM {
         match simple_logger::init() {
             Ok(_) => {}
             Err(e) => {
-                println!("Failed to start logger: {}", e);
+                println!("failed to start logger: {}", e);
             }
         }
 
@@ -157,8 +157,8 @@ impl GridWM {
 
                 let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone())
                 {
-                    Some((a, b)) => (a, b),
-                    None => {
+                    Some((a, Some(b))) => (a, b),
+                    _ => {
                         warn!("failed to parse keybind: {:?}", bind);
                         continue;
                     }
@@ -175,6 +175,35 @@ impl GridWM {
                         xlib::GrabModeAsync,
                     );
                 }
+            }
+
+            let move_keybind: String = self
+                .config
+                .keybinds
+                .gridwm
+                .iter()
+                .find(|bind| bind.len() == 2 && bind[1] == "move")
+                .map(|bind| bind[0].clone())
+                .unwrap_or_else(|| {
+                    warn!("failed to get move keybind. using default.");
+                    "SUPER+M".to_owned()
+                });
+
+            // TODO: this needs some improvement
+            if let Some((mask, _button_code)) = parse_keybind(self.display, move_keybind) {
+                xlib::XGrabButton(
+                    self.display,
+                    xlib::Button1,
+                    mask,
+                    root,
+                    1,
+                    (xlib::ButtonPressMask | xlib::ButtonReleaseMask | xlib::Button1MotionMask)
+                        as u32,
+                    xlib::GrabModeAsync,
+                    xlib::GrabModeAsync,
+                    0,
+                    0,
+                );
             }
 
             xlib::XGrabButton(
@@ -388,8 +417,8 @@ impl GridWM {
             }
 
             let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone()) {
-                Some((a, b)) => (a, b),
-                None => {
+                Some((a, Some(b))) => (a, b),
+                _ => {
                     warn!("failed to parse keybind: {:?}", bind);
                     continue;
                 }
@@ -435,8 +464,8 @@ impl GridWM {
             }
 
             let (mask, keycode): (u32, i32) = match parse_keybind(self.display, bind[0].clone()) {
-                Some((a, b)) => (a, b),
-                None => {
+                Some((a, Some(b))) => (a, b),
+                _ => {
                     warn!("failed to parse keybind: {:?}", bind);
                     continue;
                 }

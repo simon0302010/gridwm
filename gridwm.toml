@@ -25,7 +25,8 @@ widgets = ["desktop", "time", "battery"] # desktop, time, cpu, mem, battery
 gridwm = [
     ["SUPER+C", "close"],
     ["SUPER+RIGHT", "desktop_right"],
-    ["SUPER+LEFT", "desktop_left"]
+    ["SUPER+LEFT", "desktop_left"],
+    ["ALT", "move"] # Button1 is added in mod.rs
 ]
 exec = [
     ["SUPER+ENTER", "konsole"],

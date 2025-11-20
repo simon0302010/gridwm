@@ -1,6 +1,6 @@
 use x11::xlib;
 
-pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, i32)> {
+pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, Option<i32>)> {
     let keys = keys.split("+").map(|s| s.trim()).collect::<Vec<&str>>();
 
     let mut mask = 0;
@@ -19,22 +19,25 @@ pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, 
 
     if let Some(k) = key {
         let keysym = if k.len() == 1 {
-            k.chars().next().unwrap() as u32
+            Some(k.chars().next().unwrap() as u32)
         } else {
             match k.as_str() {
-                "SPACE" => x11::keysym::XK_space,
-                "TAB" => x11::keysym::XK_Tab,
-                "ENTER" => x11::keysym::XK_Return,
-                "RIGHT" => x11::keysym::XK_Right,
-                "LEFT" => x11::keysym::XK_Left,
-                "UP" => x11::keysym::XK_Up,
-                "DOWN" => x11::keysym::XK_Down,
-                _ => return None,
+                "SPACE" => Some(x11::keysym::XK_space),
+                "TAB" => Some(x11::keysym::XK_Tab),
+                "ENTER" => Some(x11::keysym::XK_Return),
+                "RIGHT" => Some(x11::keysym::XK_Right),
+                "LEFT" => Some(x11::keysym::XK_Left),
+                "UP" => Some(x11::keysym::XK_Up),
+                "DOWN" => Some(x11::keysym::XK_Down),
+                _ => None,
             }
         };
-        let keycode = unsafe { xlib::XKeysymToKeycode(display, keysym as u64) as i32 };
+        let mut keycode = None;
+        if let Some(key) = keysym {
+            keycode = unsafe { Some(xlib::XKeysymToKeycode(display, key as u64) as i32) };
+        }
         Some((mask, keycode))
     } else {
-        None
+        Some((mask, None))
     }
 }
