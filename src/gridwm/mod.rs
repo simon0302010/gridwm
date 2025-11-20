@@ -29,6 +29,8 @@ pub struct GridWM {
     config: Config,
     desktops: Vec<BTreeSet<Window>>,
     current_desktop: usize,
+    drag_state: Option<DragState>,
+    floating_windows: BTreeSet<Window>,
 }
 
 pub type Window = u64;
@@ -38,6 +40,15 @@ struct WindowInfo {
     y: i32,
     w: i32,
     h: i32,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct DragState {
+    window: Window,
+    start_win_x: i32,
+    start_win_y: i32,
+    start_mouse_x: i32,
+    start_mouse_y: i32,
 }
 
 impl GridWM {
@@ -72,6 +83,8 @@ impl GridWM {
             config,
             desktops,
             current_desktop,
+            drag_state: None,
+            floating_windows: BTreeSet::new(),
         })
     }
 
