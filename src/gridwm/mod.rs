@@ -317,7 +317,49 @@ impl GridWM {
                             self.handle_key(event);
                         }
                         xlib::ButtonPress => {
-                            self.handle_button(event);
+                            let btn_event: xlib::XButtonPressedEvent = From::from(event);
+
+                            // TODO: this needs improvement
+                            let move_keybind: String = self
+                                .config
+                                .keybinds
+                                .gridwm
+                                .iter()
+                                .find(|bind| bind.len() == 2 && bind[1] == "move")
+                                .map(|bind| bind[0].clone())
+                                .unwrap_or_else(|| {
+                                    warn!("failed to get move keybind. using default.");
+                                    "SUPER+M".to_owned()
+                                });
+
+                            let is_drag_bind = if let Some((mask, _)) =
+                                parse_keybind(self.display, move_keybind)
+                            {
+                                // TODO: don't hardcode
+                                let config_btn = xlib::Button1;
+                                (btn_event.state & mask == mask) && (btn_event.button == config_btn)
+                            } else {
+                                false
+                            };
+
+                            if is_drag_bind {
+                                self.handle_drag_start(btn_event);
+                            } else {
+                                self.handle_button(event);
+                            }
+                        }
+                        xlib::MotionNotify => {
+                            let motion_event: xlib::XMotionEvent = From::from(event);
+                            while xlib::XCheckTypedEvent(
+                                self.display,
+                                xlib::MotionNotify,
+                                &mut event,
+                            ) > 0
+                            {}
+                            self.handle_motion(motion_event);
+                        }
+                        xlib::ButtonRelease => {
+                            self.handle_release(From::from(event));
                         }
                         _ => {
                             // debug!("event triggered: {:?}", event);
@@ -372,6 +414,7 @@ impl GridWM {
         let mut desktop = self.get_desktop(self.current_desktop);
         desktop.remove(&event.window);
         self.set_desktop(self.current_desktop, desktop);
+        self.floating_windows.remove(&event.window);
     }
 
     fn get_screen_size(&self) -> Result<(i16, i16), GridWMError> {
@@ -397,7 +440,7 @@ impl GridWM {
         unsafe { xlib::XResizeWindow(self.display, window, width, height) };
     }
 
-    fn _get_window_attributes(&self, window: Window) -> XWindowAttributes {
+    fn get_window_attributes(&self, window: Window) -> XWindowAttributes {
         let mut attrs: XWindowAttributes = unsafe { zeroed() };
         unsafe {
             xlib::XGetWindowAttributes(self.display, window, &mut attrs);
@@ -533,6 +576,7 @@ impl GridWM {
         }
     }
 
+    // TODO: maybe move it somewhere else
     fn draw_bar(&self, content: Option<String>) {
         unsafe {
             let root = XDefaultRootWindow(self.display);
@@ -727,6 +771,10 @@ impl GridWM {
     }
 
     fn is_tileable(&self, window: Window) -> bool {
+        if self.floating_windows.contains(&window) {
+            return false;
+        }
+
         unsafe {
             let window_type = xlib::XInternAtom(
                 self.display,
@@ -822,5 +870,45 @@ impl GridWM {
 
             XClearWindow(self.display, root_window);
         };
+    }
+
+    fn handle_drag_start(&mut self, event: xlib::XButtonEvent) {
+        if event.subwindow == 0 {
+            return;
+        }
+
+        self.floating_windows.insert(event.subwindow);
+
+        let attr = self.get_window_attributes(event.subwindow);
+
+        self.drag_state = Some(DragState {
+            window: event.subwindow,
+            start_win_x: attr.x,
+            start_win_y: attr.y,
+            start_mouse_x: event.x_root,
+            start_mouse_y: event.y_root,
+        });
+
+        unsafe {
+            xlib::XRaiseWindow(self.display, event.subwindow);
+            // replay pointer
+            xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
+        }
+    }
+
+    fn handle_motion(&mut self, event: xlib::XMotionEvent) {
+        if let Some(state) = self.drag_state {
+            let delta_x = event.x_root - state.start_mouse_x;
+            let delta_y = event.y_root - state.start_mouse_y;
+
+            let new_x = state.start_win_x + delta_x;
+            let new_y = state.start_win_y + delta_y;
+
+            self.move_window(state.window, new_x, new_y);
+        }
+    }
+
+    fn handle_release(&mut self, _event: xlib::XButtonEvent) {
+        self.drag_state = None;
     }
 }
