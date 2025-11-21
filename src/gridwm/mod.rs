@@ -18,9 +18,7 @@ use std::{
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor,
-        XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues,
-        XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes,
+        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
     },
 };
 
@@ -31,6 +29,8 @@ pub struct GridWM {
     current_desktop: usize,
     drag_state: Option<DragState>,
     floating_windows: BTreeSet<Window>,
+    bar_gc: xlib::GC,
+    background_gc: xlib::GC
 }
 
 pub type Window = u64;
@@ -78,6 +78,14 @@ impl GridWM {
             });
         let config = Config::from_file(&config_path)?;
 
+        let (background_gc, bar_gc) = match create_bar_gc(display, &config) {
+            Some(dat) => dat,
+            None => {
+                error!("failed to create bar and background gc. exiting.");
+                std::process::exit(1);
+            }
+        };
+
         Ok(GridWM {
             display,
             config,
@@ -85,6 +93,8 @@ impl GridWM {
             current_desktop,
             drag_state: None,
             floating_windows: BTreeSet::new(),
+            background_gc,
+            bar_gc
         })
     }
 
@@ -364,6 +374,8 @@ impl GridWM {
                     let _ = data_resp_tx.send(payload);
                 }
             }
+
+            thread::sleep(Duration::from_millis(10));
         }
     }
 
@@ -616,95 +628,12 @@ impl GridWM {
                 }
             };
 
-            let screen = XDefaultScreen(self.display);
-            let mut bar_color: XColor = std::mem::zeroed();
-            let mut background_color: XColor = std::mem::zeroed();
-
-            let bar_hex_str = match CString::new(self.config.bar.text_color.clone()) {
-                Ok(hex_str) => hex_str,
-                Err(e) => {
-                    error!("failed to convert bar text color str to cstring: {}", e);
-                    return;
-                }
-            };
-
-            let background_hex_str = match CString::new(self.config.bar.background_color.clone()) {
-                Ok(hex_str) => hex_str,
-                Err(e) => {
-                    error!(
-                        "failed to convert bar background color str to cstring: {}",
-                        e
-                    );
-                    return;
-                }
-            };
-
-            if XParseColor(
-                self.display,
-                XDefaultColormap(self.display, screen),
-                bar_hex_str.as_ptr(),
-                &mut bar_color,
-            ) != 1
-            {
-                error!("failed to parse bar text color");
-            }
-
-            if XParseColor(
-                self.display,
-                XDefaultColormap(self.display, screen),
-                background_hex_str.as_ptr(),
-                &mut background_color,
-            ) != 1
-            {
-                error!("failed to parse bar background color");
-            }
-
-            XAllocColor(
-                self.display,
-                XDefaultColormap(self.display, screen),
-                &mut bar_color,
-            );
-
-            XAllocColor(
-                self.display,
-                XDefaultColormap(self.display, screen),
-                &mut background_color,
-            );
-
-            let bar_gcv = XGCValues {
-                foreground: bar_color.pixel,
-                background: 0,
-                font: 0,
-                ..std::mem::zeroed()
-            };
-
-            let background_gcv = XGCValues {
-                foreground: background_color.pixel,
-                background: 0,
-                font: 0,
-                ..std::mem::zeroed()
-            };
-
-            let bar_gc = xlib::XCreateGC(
-                self.display,
-                root,
-                GCForeground as u64,
-                &bar_gcv as *const _ as *mut _,
-            );
-
-            let background_gc = xlib::XCreateGC(
-                self.display,
-                root,
-                GCForeground as u64,
-                &background_gcv as *const _ as *mut _,
-            );
-
             if let Ok((screen_w, _)) = self.get_screen_size() {
                 xlib::XClearArea(self.display, root, 0, 0, screen_w as u32, 50, 0);
                 xlib::XFillRectangle(
                     self.display,
                     root,
-                    background_gc,
+                    self.background_gc,
                     0,
                     0,
                     screen_w as u32,
@@ -716,7 +645,7 @@ impl GridWM {
             xlib::XDrawString(
                 self.display,
                 root,
-                bar_gc,
+                self.bar_gc,
                 5,
                 15,
                 bar_str.as_ptr() as *const i8,
@@ -914,7 +843,12 @@ impl GridWM {
 
         unsafe {
             // focus toplevel window
-            xlib::XSetInputFocus(self.display, win, xlib::RevertToPointerRoot, xlib::CurrentTime);
+            xlib::XSetInputFocus(
+                self.display,
+                win,
+                xlib::RevertToPointerRoot,
+                xlib::CurrentTime,
+            );
             xlib::XRaiseWindow(self.display, win);
 
             // grab pointer
@@ -955,5 +889,96 @@ impl GridWM {
             xlib::XAllowEvents(self.display, xlib::AsyncPointer, xlib::CurrentTime);
         }
         self.drag_state = None;
+    }
+}
+
+// returns (background_gc, bar_gc)
+fn create_bar_gc(display: *mut x11::xlib::_XDisplay, config: &Config) -> Option<(xlib::GC, xlib::GC)> {
+    unsafe {
+        let root = XDefaultRootWindow(display);
+        let screen = XDefaultScreen(display);
+        let mut bar_color: XColor = std::mem::zeroed();
+        let mut background_color: XColor = std::mem::zeroed();
+
+        let bar_hex_str = match CString::new(config.bar.text_color.clone()) {
+            Ok(hex_str) => hex_str,
+            Err(e) => {
+                error!("failed to convert bar text color str to cstring: {}", e);
+                return None;
+            }
+        };
+
+        let background_hex_str = match CString::new(config.bar.background_color.clone()) {
+            Ok(hex_str) => hex_str,
+            Err(e) => {
+                error!(
+                    "failed to convert bar background color str to cstring: {}",
+                    e
+                );
+                return None;
+            }
+        };
+
+        if XParseColor(
+            display,
+            XDefaultColormap(display, screen),
+            bar_hex_str.as_ptr(),
+            &mut bar_color,
+        ) != 1
+        {
+            error!("failed to parse bar text color");
+        }
+
+        if XParseColor(
+            display,
+            XDefaultColormap(display, screen),
+            background_hex_str.as_ptr(),
+            &mut background_color,
+        ) != 1
+        {
+            error!("failed to parse bar background color");
+        }
+
+        XAllocColor(
+            display,
+            XDefaultColormap(display, screen),
+            &mut bar_color,
+        );
+
+        XAllocColor(
+            display,
+            XDefaultColormap(display, screen),
+            &mut background_color,
+        );
+
+        let bar_gcv = XGCValues {
+            foreground: bar_color.pixel,
+            background: 0,
+            font: 0,
+            ..std::mem::zeroed()
+        };
+
+        let background_gcv = XGCValues {
+            foreground: background_color.pixel,
+            background: 0,
+            font: 0,
+            ..std::mem::zeroed()
+        };
+
+        let bar_gc = xlib::XCreateGC(
+            display,
+            root,
+            GCForeground as u64,
+            &bar_gcv as *const _ as *mut _,
+        );
+
+        let background_gc = xlib::XCreateGC(
+            display,
+            root,
+            GCForeground as u64,
+            &background_gcv as *const _ as *mut _,
+        );
+
+        Some((background_gc, bar_gc))
     }
 }

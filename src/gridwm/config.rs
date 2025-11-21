@@ -95,7 +95,7 @@ impl Default for Bar {
 pub struct Keybinds {
     pub gridwm: Vec<Vec<String>>,
     pub exec: Vec<Vec<String>>,
-    pub move_mod: String
+    pub move_mod: String,
 }
 
 impl Default for Keybinds {
@@ -103,7 +103,7 @@ impl Default for Keybinds {
         Self {
             gridwm: Vec::new(),
             exec: Vec::new(),
-            move_mod: "SUPER".to_string()
+            move_mod: "SUPER".to_string(),
         }
     }
 }

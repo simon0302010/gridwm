@@ -49,6 +49,6 @@ pub fn parse_modifier(modifier: &String) -> Option<u32> {
         "SHIFT" => Some(xlib::ShiftMask),
         "ALT" => Some(xlib::Mod1Mask),
         "SUPER" | "WIN" | "WINDOWS" | "MOD4" => Some(xlib::Mod4Mask),
-        _ => None
+        _ => None,
     }
 }

@@ -84,7 +84,7 @@ pub fn battery_widget() -> String {
             "BAT {}: {:.0}% ({:?})",
             idx + 1,
             battery.state_of_charge().value * 100.0,
-            battery.state()
+            battery.state() // TODO: fix it displaying "Unknown" when not charging
         ));
     }
 
