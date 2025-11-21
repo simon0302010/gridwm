@@ -85,12 +85,22 @@ Keybinds for executing custom commands.
 
 - **Format**: Array of arrays with two strings: `[["KEY_COMBINATION", "COMMAND"], ...]`
   ```toml
-  [keybinds.]
+  [keybinds]
   exec = [
     ["SUPER+Return", "alacritty"],
     ["SUPER+D", "dmenu_run"]
   ]
   ```
+
+### `[keybinds]` (other keybinds)
+Other keybinds.
+
+- **`move_mod`** (string): Modifier key for moving windows (default: `"SUPER"`).
+  ```toml
+  [keybinds]
+  move_mod = "SUPER"
+  ```
+
 
 ## Example Configuration
 
@@ -99,7 +109,7 @@ Keybinds for executing custom commands.
 exec = ["firefox"]
 
 [keyboard]
-layout = "us"
+layout = "de"
 
 [mouse]
 use_acceleration = false
@@ -118,17 +128,17 @@ update = 2.0
 enable = true
 widgets = ["desktop", "time", "cpu", "mem"]
 
-[[keybinds.gridwm]]
+[keybinds]
 gridwm = [
   ["SUPER+Q", "close"],
   ["SUPER+Right", "desktop_right"],
   ["SUPER+Left", "desktop_left"]
 ]
-
-[[keybinds.exec]]
 exec = [
   ["SUPER+Return", "alacritty"]
 ]
+move_mod = "ALT"
+
 ```
 
 > Empty or missing configuration options will default to the built-in settings.

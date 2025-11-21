@@ -593,6 +593,7 @@ impl GridWM {
     }
 
     // TODO: maybe move it somewhere else
+    // TODO: fix bar disappearing when window is dragged over it
     fn draw_bar(&self, content: Option<String>) {
         unsafe {
             let root = XDefaultRootWindow(self.display);
