@@ -81,10 +81,10 @@ pub fn battery_widget() -> String {
         };
 
         data.push(format!(
-            "BAT {}: {:.0}% ({})",
+            "BAT {}: {:.0}% ({:?})",
             idx + 1,
             battery.state_of_charge().value * 100.0,
-            battery.state().to_string()
+            battery.state()
         ));
     }
 
