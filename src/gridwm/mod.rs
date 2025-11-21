@@ -180,25 +180,12 @@ impl GridWM {
                 }
             }
 
-            let move_keybind: String = self
-                .config
-                .keybinds
-                .gridwm
-                .iter()
-                .find(|bind| bind.len() == 2 && bind[1] == "move")
-                .map(|bind| bind[0].clone())
-                .unwrap_or_else(|| {
-                    warn!("failed to get move keybind. using default.");
-                    "SUPER+M".to_owned()
-                });
-
-            // TODO: this needs some improvement
-            if let Some((mask, _button_code)) = parse_keybind(self.display, move_keybind) {
+            if let Some(modifier) = parse_modifier(&self.config.keybinds.move_mod) {
                 for &extra_mod in &EXTRA_MODS {
                     xlib::XGrabButton(
                         self.display,
                         xlib::Button1,
-                        mask | extra_mod,
+                        modifier | extra_mod,
                         root,
                         1,
                         (xlib::ButtonPressMask | xlib::ButtonReleaseMask | xlib::Button1MotionMask)
@@ -324,21 +311,8 @@ impl GridWM {
                         xlib::ButtonPress => {
                             let btn_event: xlib::XButtonPressedEvent = From::from(event);
 
-                            // TODO: this needs improvement
-                            let move_keybind: String = self
-                                .config
-                                .keybinds
-                                .gridwm
-                                .iter()
-                                .find(|bind| bind.len() == 2 && bind[1] == "move")
-                                .map(|bind| bind[0].clone())
-                                .unwrap_or_else(|| {
-                                    warn!("failed to get move keybind. using default.");
-                                    "SUPER+M".to_owned()
-                                });
-
-                            let is_drag_bind = if let Some((mask, _)) =
-                                parse_keybind(self.display, move_keybind)
+                            let is_drag_bind = if let Some(mask) =
+                                parse_modifier(&self.config.keybinds.move_mod)
                             {
                                 // TODO: don't hardcode
                                 let config_btn = xlib::Button1;

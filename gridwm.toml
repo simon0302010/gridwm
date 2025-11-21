@@ -26,9 +26,9 @@ gridwm = [
     ["SUPER+C", "close"],
     ["SUPER+RIGHT", "desktop_right"],
     ["SUPER+LEFT", "desktop_left"],
-    ["ALT", "move"] # Button1 is added in mod.rs
 ]
 exec = [
     ["SUPER+ENTER", "konsole"],
     ["SUPER+SPACE", "rofi -show drun"]
 ]
+move_mod = "ALT"

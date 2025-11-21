@@ -41,3 +41,14 @@ pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, 
         Some((mask, None))
     }
 }
+
+pub fn parse_modifier(modifier: &String) -> Option<u32> {
+    let modifier_upper: String = modifier.to_uppercase();
+    match modifier_upper.as_str() {
+        "CTRL" | "CONTROL" => Some(xlib::ControlMask),
+        "SHIFT" => Some(xlib::ShiftMask),
+        "ALT" => Some(xlib::Mod1Mask),
+        "SUPER" | "WIN" | "WINDOWS" | "MOD4" => Some(xlib::Mod4Mask),
+        _ => None
+    }
+}
