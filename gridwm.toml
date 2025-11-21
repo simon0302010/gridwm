@@ -19,7 +19,7 @@ background_color = "#000000"
 height = 20
 enable = true
 update = 3.0
-widgets = ["desktop", "time", "battery"] # desktop, time, cpu, mem, battery
+widgets = ["desktop", "time", "battery", "cpu", "mem"] # desktop, time, cpu, mem, battery
 
 [keybinds]
 gridwm = [

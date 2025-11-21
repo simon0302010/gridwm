@@ -1,7 +1,7 @@
 use chrono::{Datelike, Timelike};
 use log::{error, warn};
 use std::thread::sleep;
-use sysinfo::{MINIMUM_CPU_UPDATE_INTERVAL, System};
+use sysinfo::{Components, MINIMUM_CPU_UPDATE_INTERVAL, System};
 
 pub fn time_widget() -> String {
     let now = chrono::offset::Local::now();
@@ -36,7 +36,18 @@ pub fn cpu_widget() -> String {
         0
     };
 
-    format!("CPU: {}%", avg)
+    let mut temp_str = "Failed to get CPU temperature".to_string();
+    let components = Components::new_with_refreshed_list();
+    for component in &components {
+        if let Some(temperature) = component.temperature() {
+            if component.label().to_lowercase().contains("package") {
+            temp_str = format!("{}C", temperature);
+            break;
+            }
+        }
+    }
+
+    format!("CPU: {}%, {}", avg, temp_str)
 }
 
 pub fn mem_widget() -> String {
