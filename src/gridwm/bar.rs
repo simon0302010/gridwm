@@ -41,8 +41,8 @@ pub fn cpu_widget() -> String {
     for component in &components {
         if let Some(temperature) = component.temperature() {
             if component.label().to_lowercase().contains("package") {
-            temp_str = format!("{}C", temperature);
-            break;
+                temp_str = format!("{}*C", temperature);
+                break;
             }
         }
     }

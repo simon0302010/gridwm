@@ -18,7 +18,9 @@ use std::{
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
+        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor,
+        XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues,
+        XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes,
     },
 };
 
@@ -30,7 +32,7 @@ pub struct GridWM {
     drag_state: Option<DragState>,
     floating_windows: BTreeSet<Window>,
     bar_gc: xlib::GC,
-    background_gc: xlib::GC
+    background_gc: xlib::GC,
 }
 
 pub type Window = u64;
@@ -94,7 +96,7 @@ impl GridWM {
             drag_state: None,
             floating_windows: BTreeSet::new(),
             background_gc,
-            bar_gc
+            bar_gc,
         })
     }
 
@@ -893,7 +895,10 @@ impl GridWM {
 }
 
 // returns (background_gc, bar_gc)
-fn create_bar_gc(display: *mut x11::xlib::_XDisplay, config: &Config) -> Option<(xlib::GC, xlib::GC)> {
+fn create_bar_gc(
+    display: *mut x11::xlib::_XDisplay,
+    config: &Config,
+) -> Option<(xlib::GC, xlib::GC)> {
     unsafe {
         let root = XDefaultRootWindow(display);
         let screen = XDefaultScreen(display);
@@ -939,11 +944,7 @@ fn create_bar_gc(display: *mut x11::xlib::_XDisplay, config: &Config) -> Option<
             error!("failed to parse bar background color");
         }
 
-        XAllocColor(
-            display,
-            XDefaultColormap(display, screen),
-            &mut bar_color,
-        );
+        XAllocColor(display, XDefaultColormap(display, screen), &mut bar_color);
 
         XAllocColor(
             display,
