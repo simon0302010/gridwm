@@ -12,8 +12,8 @@ use signals::*;
 
 use log::*;
 use std::{
-    collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice, sync::mpsc, thread,
-    time::Duration,
+    collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice, sync::{Arc, Mutex, mpsc}, thread,
+    time::{Duration, Instant},
 };
 use x11::{
     xinerama,
@@ -33,6 +33,7 @@ pub struct GridWM {
     floating_windows: BTreeSet<Window>,
     bar_gc: xlib::GC,
     background_gc: xlib::GC,
+    bar_str: String
 }
 
 pub type Window = u64;
@@ -88,6 +89,9 @@ impl GridWM {
             }
         };
 
+        let mut bar_str = get_widgets(&config.bar.widgets);
+        bar_str = bar_str.replace("DESKTOP_HERE", &desktop_widget(current_desktop));
+
         Ok(GridWM {
             display,
             config,
@@ -97,6 +101,7 @@ impl GridWM {
             floating_windows: BTreeSet::new(),
             background_gc,
             bar_gc,
+            bar_str
         })
     }
 
@@ -265,31 +270,28 @@ impl GridWM {
         }
 
         let (timer_tx, timer_rx) = mpsc::channel();
-        let (data_req_tx, data_req_rx) = mpsc::channel();
-        let (data_resp_tx, data_resp_rx) = mpsc::channel();
 
-        let bar_update = self.config.bar.update;
+        let bar_config = self.config.bar.clone();
 
         thread::spawn(move || {
             loop {
-                thread::sleep(Duration::from_millis((bar_update * 1000.0) as u64));
-                let _ = data_req_tx.send("BAR");
-                // Will freeze if "BAR" isn't sent
-                let (widgets, current_desktop) = match data_resp_rx.recv() {
-                    Ok(data) => data,
-                    Err(e) => {
-                        warn!("error occured in bar management thread: {}", e);
-                        continue;
-                    }
-                };
-                let data = get_widgets(&widgets, &current_desktop);
-                timer_tx.send(data).ok();
+                // TODO: subtract processing time
+                thread::sleep(Duration::from_millis((bar_config.update * 1000.0) as u64));
+                let data = get_widgets(&bar_config.widgets);
+
+                if timer_tx.send(data).is_err() {
+                    break;
+                }
             }
         });
 
         let mut event: xlib::XEvent = unsafe { zeroed() };
 
         loop {
+            let is_pending = unsafe {
+                xlib::XPending(self.display) > 0
+            };
+            let process_start = Instant::now();
             while unsafe { xlib::XPending(self.display) } > 0 {
                 unsafe {
                     xlib::XNextEvent(self.display, &mut event);
@@ -361,23 +363,19 @@ impl GridWM {
                 }
             }
 
-            if let Ok(bar_content) = timer_rx.try_recv()
+            if is_pending {
+                // uncomment to see how long each processing iteration takes
+                // debug!("processing took {} microseconds.", process_start.elapsed().as_micros())
+            }
+
+            if let Ok(data) = timer_rx.try_recv()
                 && self.config.bar.enable
             {
-                self.draw_bar(Some(bar_content));
+                self.bar_str = data;
+                self.draw_bar(None);
             }
 
-            if let Ok(data_req) = data_req_rx.try_recv() {
-                if data_req == "BAR" {
-                    let payload = (
-                        self.config.bar.widgets.clone(),
-                        self.current_desktop.clone(),
-                    );
-                    let _ = data_resp_tx.send(payload);
-                }
-            }
-
-            thread::sleep(Duration::from_millis(10));
+            thread::sleep(Duration::from_millis(5));
         }
     }
 
@@ -612,12 +610,12 @@ impl GridWM {
         unsafe {
             let root = XDefaultRootWindow(self.display);
 
-            let mut bar_str =
-                CString::new(get_widgets(&self.config.bar.widgets, &self.current_desktop));
-
-            if let Some(text) = content {
-                bar_str = CString::new(text);
-            }
+            let bar_str = match content {
+                Some(text) => CString::new(text),
+                None => {
+                    CString::new(self.bar_str.replace("DESKTOP_HERE", &desktop_widget(self.current_desktop)))
+                }
+            };
 
             let bar_str = match bar_str {
                 Ok(stri) => stri,

@@ -65,7 +65,7 @@ impl Default for Desktop {
 }
 
 // bar section of config
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(default)]
 pub struct Bar {
     pub text_color: String,

@@ -106,11 +106,12 @@ pub fn battery_widget() -> String {
     }
 }
 
-pub fn get_widgets(widgets: &Vec<String>, desktop_num: &usize) -> String {
+// TODO: fix "DESKTOP_HERE" thing
+pub fn get_widgets(widgets: &Vec<String>) -> String {
     let mut data: Vec<String> = Vec::new();
     for widget in widgets {
         data.push(match widget.as_str() {
-            "desktop" => desktop_widget(*desktop_num),
+            "desktop" => "DESKTOP_HERE".to_string(),
             "time" => time_widget(),
             "cpu" => cpu_widget(),
             "mem" => mem_widget(),
