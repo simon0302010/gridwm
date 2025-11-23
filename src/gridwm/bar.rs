@@ -8,7 +8,7 @@ pub fn time_widget() -> String {
 
     let time_str = format!(
         "{}, {} {} {}, {:02}:{:02}:{:02}",
-        now.weekday().to_string(),
+        now.weekday(),
         now.day(),
         now.format("%B"),
         now.year(),
@@ -30,7 +30,7 @@ pub fn cpu_widget() -> String {
         usages.push(cpu.cpu_usage() as u32);
     }
     let sum: u32 = usages.iter().sum();
-    let avg = if usages.len() > 0 {
+    let avg = if !usages.is_empty() {
         sum / usages.len() as u32
     } else {
         0
@@ -39,11 +39,11 @@ pub fn cpu_widget() -> String {
     let mut temp_str = "Failed to get CPU temperature".to_string();
     let components = Components::new_with_refreshed_list();
     for component in &components {
-        if let Some(temperature) = component.temperature() {
-            if component.label().to_lowercase().contains("package") {
-                temp_str = format!("{}*C", temperature);
-                break;
-            }
+        if let Some(temperature) = component.temperature()
+            && component.label().to_lowercase().contains("package")
+        {
+            temp_str = format!("{}*C", temperature);
+            break;
         }
     }
 

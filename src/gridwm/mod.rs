@@ -12,7 +12,13 @@ use signals::*;
 
 use log::*;
 use std::{
-    collections::BTreeSet, ffi::CString, mem::zeroed, process::Command, slice, sync::{Arc, Mutex, mpsc}, thread,
+    collections::BTreeSet,
+    ffi::CString,
+    mem::zeroed,
+    process::Command,
+    slice,
+    sync::mpsc,
+    thread,
     time::{Duration, Instant},
 };
 use x11::{
@@ -33,7 +39,7 @@ pub struct GridWM {
     floating_windows: BTreeSet<Window>,
     bar_gc: xlib::GC,
     background_gc: xlib::GC,
-    bar_str: String
+    bar_str: String,
 }
 
 pub type Window = u64;
@@ -101,7 +107,7 @@ impl GridWM {
             floating_windows: BTreeSet::new(),
             background_gc,
             bar_gc,
-            bar_str
+            bar_str,
         })
     }
 
@@ -288,10 +294,8 @@ impl GridWM {
         let mut event: xlib::XEvent = unsafe { zeroed() };
 
         loop {
-            let is_pending = unsafe {
-                xlib::XPending(self.display) > 0
-            };
-            let process_start = Instant::now();
+            let is_pending = unsafe { xlib::XPending(self.display) > 0 };
+            let _process_start = Instant::now();
             while unsafe { xlib::XPending(self.display) } > 0 {
                 unsafe {
                     xlib::XNextEvent(self.display, &mut event);
@@ -381,7 +385,7 @@ impl GridWM {
 
     fn set_desktop(&mut self, index: usize, value: BTreeSet<Window>) {
         if self.desktops.len() <= index {
-            self.desktops.resize_with(index + 1, || BTreeSet::new());
+            self.desktops.resize_with(index + 1, BTreeSet::new);
         }
         self.desktops[index] = value;
     }
@@ -512,7 +516,7 @@ impl GridWM {
             let event_mask = event.state & relevant_modifiers;
 
             if event_mask == mask && event.keycode as i32 == keycode {
-                match shell_words::split(&bind[1].as_str()) {
+                match shell_words::split(bind[1].as_str()) {
                     Ok(parts) => {
                         let program = &parts[0];
                         let args = &parts[1..];
@@ -612,9 +616,10 @@ impl GridWM {
 
             let bar_str = match content {
                 Some(text) => CString::new(text),
-                None => {
-                    CString::new(self.bar_str.replace("DESKTOP_HERE", &desktop_widget(self.current_desktop)))
-                }
+                None => CString::new(
+                    self.bar_str
+                        .replace("DESKTOP_HERE", &desktop_widget(self.current_desktop)),
+                ),
             };
 
             let bar_str = match bar_str {
@@ -648,7 +653,7 @@ impl GridWM {
                 self.bar_gc,
                 5,
                 15,
-                bar_str.as_ptr() as *const i8,
+                bar_str.as_ptr(),
                 bar_str.to_bytes().len() as i32,
             );
         }
@@ -681,7 +686,7 @@ impl GridWM {
 
     fn tile(&self, n: usize, screen_w: i32, screen_h: i32) -> Vec<WindowInfo> {
         let cols = (n as f32).sqrt().ceil() as i32;
-        let rows = ((n as i32 + cols - 1) / cols) as i32;
+        let rows = (n as i32 + cols - 1) / cols;
         let w = screen_w / cols;
         let mut h = screen_h / rows;
         if self.config.bar.enable {
@@ -722,31 +727,17 @@ impl GridWM {
         }
 
         unsafe {
-            let window_type = xlib::XInternAtom(
-                self.display,
-                b"_NET_WM_WINDOW_TYPE\0".as_ptr() as *const i8,
-                0,
-            );
-            let notification_type = xlib::XInternAtom(
-                self.display,
-                b"_NET_WM_WINDOW_TYPE_NOTIFICATION\0".as_ptr() as *const i8,
-                0,
-            );
-            let dock_type = xlib::XInternAtom(
-                self.display,
-                b"_NET_WM_WINDOW_TYPE_DOCK\0".as_ptr() as *const i8,
-                0,
-            );
-            let dialog_type = xlib::XInternAtom(
-                self.display,
-                b"_NET_WM_WINDOW_TYPE_DIALOG\0".as_ptr() as *const i8,
-                0,
-            );
-            let splash_type = xlib::XInternAtom(
-                self.display,
-                b"_NET_WM_WINDOW_TYPE_SPLASH\0".as_ptr() as *const i8,
-                0,
-            );
+            let window_type_c = CString::new("_NET_WM_WINDOW_TYPE").unwrap();
+            let notif_c = CString::new("_NET_WM_WINDOW_TYPE_NOTIFICATION").unwrap();
+            let dock_c = CString::new("_NET_WM_WINDOW_TYPE_DOCK").unwrap();
+            let dialog_c = CString::new("_NET_WM_WINDOW_TYPE_DIALOG").unwrap();
+            let splash_c = CString::new("_NET_WM_WINDOW_TYPE_SPLASH").unwrap();
+
+            let window_type = xlib::XInternAtom(self.display, window_type_c.as_ptr(), 0);
+            let notification_type = xlib::XInternAtom(self.display, notif_c.as_ptr(), 0);
+            let dock_type = xlib::XInternAtom(self.display, dock_c.as_ptr(), 0);
+            let dialog_type = xlib::XInternAtom(self.display, dialog_c.as_ptr(), 0);
+            let splash_type = xlib::XInternAtom(self.display, splash_c.as_ptr(), 0);
 
             let mut actual_type: xlib::Atom = 0;
             let mut actual_format: i32 = 0;

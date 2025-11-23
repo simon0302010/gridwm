@@ -42,7 +42,7 @@ pub fn parse_keybind(display: *mut xlib::Display, keys: String) -> Option<(u32, 
     }
 }
 
-pub fn parse_modifier(modifier: &String) -> Option<u32> {
+pub fn parse_modifier(modifier: &str) -> Option<u32> {
     let modifier_upper: String = modifier.to_uppercase();
     match modifier_upper.as_str() {
         "CTRL" | "CONTROL" => Some(xlib::ControlMask),
