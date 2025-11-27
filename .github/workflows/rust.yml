@@ -11,9 +11,7 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v4
     - name: Update apt
@@ -22,3 +20,27 @@ jobs:
       run: sudo apt install xserver-xorg xinit x11-xserver-utils x11-xkb-utils xorg pkg-config libx11-dev libxinerama-dev
     - name: Build
       run: cargo build --release --verbose
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: gridwm-release
+        path: target/release/gridwm
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: gridwm-release
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: gridwm
+        tag_name: v${{ github.run_number }}
+        prerelease: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

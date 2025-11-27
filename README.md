@@ -11,6 +11,7 @@ https://github.com/user-attachments/assets/cb0c99de-f742-4768-86b3-7a5043a1eec7
 
 - Basic tiling window management
 - Moveable windows
+- Resizable windows
 - Customizable keyboard shortcuts for managing windows and workspaces
 - Customizable keyboard shortcuts for running custom commands
 - Easy to configure using a config file
@@ -21,7 +22,6 @@ https://github.com/user-attachments/assets/cb0c99de-f742-4768-86b3-7a5043a1eec7
 
 ## Todo
 
-- Allow user to resize windows
 - Add support for notifications
 - Add support for multi-monitor setups
 
@@ -62,7 +62,6 @@ To start GridWM, run:
 ```bash
 startx path/to/gridwm
 ```
-if you don't want your existing X configuration to be overwritten.
 
 ## Contributing
 
