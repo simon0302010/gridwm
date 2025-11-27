@@ -41,7 +41,7 @@ pub struct GridWM {
     background_gc: xlib::GC,
     bar_str: String,
     screen_width: i16,
-    screen_height: i16
+    screen_height: i16,
 }
 
 pub type Window = u64;
@@ -119,7 +119,7 @@ impl GridWM {
             bar_gc,
             bar_str,
             screen_width,
-            screen_height
+            screen_height,
         })
     }
 
@@ -356,7 +356,7 @@ impl GridWM {
 
         loop {
             let is_pending = unsafe { xlib::XPending(self.display) > 0 };
-            let _process_start = Instant::now();
+            let process_start = Instant::now();
             while unsafe { xlib::XPending(self.display) } > 0 {
                 unsafe {
                     xlib::XNextEvent(self.display, &mut event);
@@ -468,8 +468,14 @@ impl GridWM {
                 self.draw_bar(None);
             }
 
-            // TODO: make configurable
-            thread::sleep(Duration::from_millis(5));
+            // subtract time process took from sleep time
+            let sleep_time = Duration::from_millis(self.config.general.update_ms);
+            let process_took = process_start.elapsed();
+            if process_took < sleep_time {
+                thread::sleep(sleep_time - process_took);
+            } else {
+                warn!("main loop took too long!");
+            }
         }
     }
 
@@ -719,7 +725,7 @@ impl GridWM {
                 self.screen_width as u32,
                 self.config.bar.height,
             );
-            
+
             xlib::XDrawString(
                 self.display,
                 root,
@@ -729,7 +735,7 @@ impl GridWM {
                 bar_str.as_ptr(),
                 bar_str.to_bytes().len() as i32,
             );
-            
+
             XFlush(self.display);
         }
     }
@@ -746,7 +752,11 @@ impl GridWM {
             return;
         }
 
-        let positions = self.tile(tileable.len(), self.screen_width as i32, self.screen_height as i32);
+        let positions = self.tile(
+            tileable.len(),
+            self.screen_width as i32,
+            self.screen_height as i32,
+        );
         for (id, window) in tileable.iter().zip(positions) {
             self.resize_window(*id, window.w as u32, window.h as u32);
             self.move_window(*id, window.x, window.y);
@@ -837,11 +847,11 @@ impl GridWM {
                     && wtype != dialog_type
                     && wtype != splash_type;
             }
-            
+
             if !prop.is_null() {
                 xlib::XFree(prop as *mut _);
             }
-            
+
             true
         }
     }
@@ -895,7 +905,12 @@ impl GridWM {
         self.layout();
 
         unsafe {
-            xlib::XSetInputFocus(self.display, win, xlib::RevertToPointerRoot, xlib::CurrentTime);
+            xlib::XSetInputFocus(
+                self.display,
+                win,
+                xlib::RevertToPointerRoot,
+                xlib::CurrentTime,
+            );
             xlib::XRaiseWindow(self.display, win);
         }
 
@@ -907,7 +922,11 @@ impl GridWM {
         let new_height = (attr.height as u32 - steps).max(100);
 
         self.resize_window(win, new_width, new_height);
-        self.move_window(win, attr.x + (attr.width - new_width as i32) / 2, attr.y + (attr.height - new_height as i32) / 2);
+        self.move_window(
+            win,
+            attr.x + (attr.width - new_width as i32) / 2,
+            attr.y + (attr.height - new_height as i32) / 2,
+        );
     }
 
     fn handle_drag_start(&mut self, event: xlib::XButtonEvent) {

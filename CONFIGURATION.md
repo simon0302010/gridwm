@@ -13,6 +13,15 @@ Executed programs on WM startup.
   exec = ["picom", "kitty"]
   ```
 
+### `[general]`
+General settings.
+
+- **`update_ms`** (integer): Run interval for main loop in milliseconds (default: `5`).
+  ```toml
+  [general]
+  update_ms = 5
+  ```
+
 ### `[keyboard]`
 Keyboard settings.
 

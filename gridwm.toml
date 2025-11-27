@@ -1,6 +1,9 @@
 [start]
 exec = []
 
+[general]
+update_ms = 5
+
 [keyboard]
 layout = "de"
 

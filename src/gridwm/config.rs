@@ -8,11 +8,25 @@ use crate::gridwm::error::GridWMError;
 #[serde(default)]
 pub struct Config {
     pub start: Start,
+    pub general: General,
     pub keyboard: Keyboard,
     pub mouse: Mouse,
     pub desktop: Desktop,
     pub bar: Bar,
     pub keybinds: Keybinds,
+}
+
+// general section of config
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct General {
+    pub update_ms: u64,
+}
+
+impl Default for General {
+    fn default() -> Self {
+        Self { update_ms: 5 }
+    }
 }
 
 // keyboard section of config
