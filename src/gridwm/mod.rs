@@ -420,12 +420,13 @@ impl GridWM {
                                 false
                             };
 
+                            // TODO: implement window resizing with configurable speed
                             if is_drag_bind {
                                 self.handle_drag_start(btn_event);
                             } else if is_scroll_up {
                                 info!("larger");
                             } else if is_scroll_down {
-                                info!("smaller");
+                                self.scale_down(btn_event);
                             } else {
                                 self.handle_button(event);
                             }
@@ -464,11 +465,10 @@ impl GridWM {
             }
 
             if self.config.bar.enable {
-                let bar_draw_start = Instant::now();
                 self.draw_bar(None);
-                debug!("bar rendering took {} microseconds", bar_draw_start.elapsed().as_micros());
             }
 
+            // TODO: make configurable
             thread::sleep(Duration::from_millis(5));
         }
     }
@@ -881,6 +881,33 @@ impl GridWM {
 
             XClearWindow(self.display, root_window);
         };
+    }
+
+    fn scale_down(&mut self, event: xlib::XButtonEvent) {
+        if event.subwindow == 0 {
+            return;
+        }
+
+        let win = self.get_toplevel(event.subwindow);
+
+        self.floating_windows.insert(win);
+
+        self.layout();
+
+        unsafe {
+            xlib::XSetInputFocus(self.display, win, xlib::RevertToPointerRoot, xlib::CurrentTime);
+            xlib::XRaiseWindow(self.display, win);
+        }
+
+        // TODO: make configurable
+        let steps = 10;
+
+        let attr = self.get_window_attributes(win);
+        let new_width = (attr.width as u32 - steps).max(100);
+        let new_height = (attr.height as u32 - steps).max(100);
+
+        self.resize_window(win, new_width, new_height);
+        self.move_window(win, attr.x + (attr.width - new_width as i32) / 2, attr.y + (attr.height - new_height as i32) / 2);
     }
 
     fn handle_drag_start(&mut self, event: xlib::XButtonEvent) {
