@@ -33,3 +33,4 @@ exec = [
     ["SUPER+SPACE", "rofi -show drun"]
 ]
 move_mod = "ALT"
+resize_mod = "ALT"

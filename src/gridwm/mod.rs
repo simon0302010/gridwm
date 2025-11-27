@@ -203,11 +203,46 @@ impl GridWM {
                 }
             }
 
+            // for dragging
             if let Some(modifier) = parse_modifier(&self.config.keybinds.move_mod) {
                 for &extra_mod in &EXTRA_MODS {
                     xlib::XGrabButton(
                         self.display,
                         xlib::Button1,
+                        modifier | extra_mod,
+                        root,
+                        1,
+                        (xlib::ButtonPressMask | xlib::ButtonReleaseMask | xlib::Button1MotionMask)
+                            as u32,
+                        xlib::GrabModeAsync,
+                        xlib::GrabModeAsync,
+                        0,
+                        0,
+                    );
+                }
+            }
+
+            // for resizing
+            if let Some(modifier) = parse_modifier(&self.config.keybinds.resize_mod) {
+                for &extra_mod in &EXTRA_MODS {
+                    // scroll up
+                    xlib::XGrabButton(
+                        self.display,
+                        xlib::Button4,
+                        modifier | extra_mod,
+                        root,
+                        1,
+                        (xlib::ButtonPressMask | xlib::ButtonReleaseMask | xlib::Button1MotionMask)
+                            as u32,
+                        xlib::GrabModeAsync,
+                        xlib::GrabModeAsync,
+                        0,
+                        0,
+                    );
+                    // scroll down
+                    xlib::XGrabButton(
+                        self.display,
+                        xlib::Button5,
                         modifier | extra_mod,
                         root,
                         1,
@@ -348,8 +383,32 @@ impl GridWM {
                                 false
                             };
 
+                            let is_scroll_up = if let Some(mask) =
+                                parse_modifier(&self.config.keybinds.resize_mod)
+                            {
+                                // TODO: don't hardcode
+                                let config_btn = xlib::Button4;
+                                (btn_event.state & mask == mask) && (btn_event.button == config_btn)
+                            } else {
+                                false
+                            };
+
+                            let is_scroll_down = if let Some(mask) =
+                                parse_modifier(&self.config.keybinds.resize_mod)
+                            {
+                                // TODO: don't hardcode
+                                let config_btn = xlib::Button5;
+                                (btn_event.state & mask == mask) && (btn_event.button == config_btn)
+                            } else {
+                                false
+                            };
+
                             if is_drag_bind {
                                 self.handle_drag_start(btn_event);
+                            } else if is_scroll_up {
+                                info!("larger");
+                            } else if is_scroll_down {
+                                info!("smaller");
                             } else {
                                 self.handle_button(event);
                             }

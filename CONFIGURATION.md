@@ -97,9 +97,11 @@ Keybinds for executing custom commands.
 Other keybinds.
 
 - **`move_mod`** (string): Modifier key for moving windows (default: `"SUPER"`).
+- **`resize_mod`** (string): Modifier key for resizing windows (default: `"SUPER"`)
   ```toml
   [keybinds]
   move_mod = "SUPER"
+  resize_mod = "SUPER"
   ```
 
 

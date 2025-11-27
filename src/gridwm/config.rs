@@ -96,6 +96,7 @@ pub struct Keybinds {
     pub gridwm: Vec<Vec<String>>,
     pub exec: Vec<Vec<String>>,
     pub move_mod: String,
+    pub resize_mod: String,
 }
 
 impl Default for Keybinds {
@@ -104,6 +105,7 @@ impl Default for Keybinds {
             gridwm: Vec::new(),
             exec: Vec::new(),
             move_mod: "SUPER".to_string(),
+            resize_mod: "SUPER".to_string(),
         }
     }
 }
