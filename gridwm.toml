@@ -26,7 +26,7 @@ gridwm = [
     ["SUPER+C", "close"],
     ["SUPER+RIGHT", "desktop_right"],
     ["SUPER+LEFT", "desktop_left"],
-    ["SUPER+Z", "unfloat"]
+    ["ALT+Z", "unfloat"]
 ]
 exec = [
     ["SUPER+ENTER", "konsole"],

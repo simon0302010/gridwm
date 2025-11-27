@@ -40,6 +40,8 @@ pub struct GridWM {
     bar_gc: xlib::GC,
     background_gc: xlib::GC,
     bar_str: String,
+    screen_width: i16,
+    screen_height: i16
 }
 
 pub type Window = u64;
@@ -98,6 +100,14 @@ impl GridWM {
         let mut bar_str = get_widgets(&config.bar.widgets);
         bar_str = bar_str.replace("DESKTOP_HERE", &desktop_widget(current_desktop));
 
+        let (screen_width, screen_height) = match get_screen_size(display) {
+            Ok(wh) => wh,
+            Err(_) => {
+                error!("failed to get screen size");
+                return Err(GridWMError::ScreenNotFound("0".to_string()));
+            }
+        };
+
         Ok(GridWM {
             display,
             config,
@@ -108,6 +118,8 @@ impl GridWM {
             background_gc,
             bar_gc,
             bar_str,
+            screen_width,
+            screen_height
         })
     }
 
@@ -312,28 +324,33 @@ impl GridWM {
 
         let (timer_tx, timer_rx) = mpsc::channel();
 
-        let bar_config = self.config.bar.clone();
+        if self.config.bar.enable {
+            let bar_config = self.config.bar.clone();
 
-        thread::spawn(move || {
-            loop {
-                let proc_start = Instant::now();
-                let data = get_widgets(&bar_config.widgets);
+            thread::spawn(move || {
+                loop {
+                    let proc_start = Instant::now();
+                    let data = get_widgets(&bar_config.widgets);
 
-                if timer_tx.send(data).is_err() {
-                    break;
+                    if timer_tx.send(data).is_err() {
+                        break;
+                    }
+                    let elapsed = proc_start.elapsed().as_millis();
+                    if elapsed < (bar_config.update * 1000.0) as u128 {
+                        thread::sleep(
+                            Duration::from_millis((bar_config.update * 1000.0) as u64)
+                                - proc_start.elapsed(),
+                        );
+                    } else {
+                        warn!(
+                            "bar update took {}ms, exceeds configured interval of {}ms",
+                            elapsed,
+                            (bar_config.update * 1000.0) as u128
+                        )
+                    }
                 }
-                let elapsed = proc_start.elapsed().as_millis();
-                if elapsed < (bar_config.update * 1000.0) as u128 {
-                    thread::sleep(Duration::from_millis((bar_config.update * 1000.0) as u64) - proc_start.elapsed());
-                } else {
-                    warn!(
-                        "bar update took {}ms, exceeds configured interval of {}ms",
-                        elapsed,
-                        (bar_config.update * 1000.0) as u128
-                    )
-                }
-            }
-        });
+            });
+        }
 
         let mut event: xlib::XEvent = unsafe { zeroed() };
 
@@ -444,7 +461,12 @@ impl GridWM {
                 && self.config.bar.enable
             {
                 self.bar_str = data;
+            }
+
+            if self.config.bar.enable {
+                let bar_draw_start = Instant::now();
                 self.draw_bar(None);
+                debug!("bar rendering took {} microseconds", bar_draw_start.elapsed().as_micros());
             }
 
             thread::sleep(Duration::from_millis(5));
@@ -480,21 +502,6 @@ impl GridWM {
         desktop.remove(&event.window);
         self.set_desktop(self.current_desktop, desktop);
         self.floating_windows.remove(&event.window);
-    }
-
-    fn get_screen_size(&self) -> Result<(i16, i16), GridWMError> {
-        unsafe {
-            let mut num: i32 = 0;
-            let screen_pointers = xinerama::XineramaQueryScreens(self.display, &mut num);
-            let screens = slice::from_raw_parts(screen_pointers, num as usize).to_vec();
-            let screen = screens.first();
-
-            if let Some(screen) = screen {
-                Ok((screen.width, screen.height))
-            } else {
-                Err(GridWMError::ScreenNotFound("0".to_string()))
-            }
-        }
     }
 
     fn move_window(&self, window: Window, x: i32, y: i32) {
@@ -562,7 +569,6 @@ impl GridWM {
                         // unfloats all windows
                         self.floating_windows.clear();
                         self.layout();
-                        self.draw_bar(None);
                     }
                     _ => {}
                 }
@@ -676,10 +682,6 @@ impl GridWM {
 
             self.current_desktop = index;
         }
-
-        if self.config.bar.enable {
-            self.draw_bar(None);
-        }
     }
 
     // TODO: maybe move it somewhere else
@@ -707,20 +709,17 @@ impl GridWM {
                 }
             };
 
-            if let Ok((screen_w, _)) = self.get_screen_size() {
-                xlib::XClearArea(self.display, root, 0, 0, screen_w as u32, 50, 0);
-                xlib::XFillRectangle(
-                    self.display,
-                    root,
-                    self.background_gc,
-                    0,
-                    0,
-                    screen_w as u32,
-                    self.config.bar.height,
-                );
-            } else {
-                xlib::XClearArea(self.display, root, 0, 0, 500, 50, 0);
-            }
+            xlib::XClearArea(self.display, root, 0, 0, self.screen_width as u32, 50, 0);
+            xlib::XFillRectangle(
+                self.display,
+                root,
+                self.background_gc,
+                0,
+                0,
+                self.screen_width as u32,
+                self.config.bar.height,
+            );
+            
             xlib::XDrawString(
                 self.display,
                 root,
@@ -730,6 +729,8 @@ impl GridWM {
                 bar_str.as_ptr(),
                 bar_str.to_bytes().len() as i32,
             );
+            
+            XFlush(self.display);
         }
     }
 
@@ -745,16 +746,10 @@ impl GridWM {
             return;
         }
 
-        if let Ok((screen_w, screen_h)) = self.get_screen_size() {
-            let positions = self.tile(tileable.len(), screen_w as i32, screen_h as i32);
-            for (id, window) in tileable.iter().zip(positions) {
-                self.resize_window(*id, window.w as u32, window.h as u32);
-                self.move_window(*id, window.x, window.y);
-            }
-        }
-
-        if self.config.bar.enable {
-            self.draw_bar(None);
+        let positions = self.tile(tileable.len(), self.screen_width as i32, self.screen_height as i32);
+        for (id, window) in tileable.iter().zip(positions) {
+            self.resize_window(*id, window.w as u32, window.h as u32);
+            self.move_window(*id, window.x, window.y);
         }
     }
 
@@ -842,6 +837,11 @@ impl GridWM {
                     && wtype != dialog_type
                     && wtype != splash_type;
             }
+            
+            if !prop.is_null() {
+                xlib::XFree(prop as *mut _);
+            }
+            
             true
         }
     }
@@ -1043,5 +1043,20 @@ fn create_bar_gc(
         );
 
         Some((background_gc, bar_gc))
+    }
+}
+
+fn get_screen_size(display: *mut xlib::Display) -> Result<(i16, i16), GridWMError> {
+    unsafe {
+        let mut num: i32 = 0;
+        let screen_pointers = xinerama::XineramaQueryScreens(display, &mut num);
+        let screens = slice::from_raw_parts(screen_pointers, num as usize).to_vec();
+        let screen = screens.first();
+
+        if let Some(screen) = screen {
+            Ok((screen.width, screen.height))
+        } else {
+            Err(GridWMError::ScreenNotFound("0".to_string()))
+        }
     }
 }
