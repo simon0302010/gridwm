@@ -281,12 +281,21 @@ impl GridWM {
 
         thread::spawn(move || {
             loop {
-                // TODO: subtract processing time
-                thread::sleep(Duration::from_millis((bar_config.update * 1000.0) as u64));
+                let proc_start = Instant::now();
                 let data = get_widgets(&bar_config.widgets);
 
                 if timer_tx.send(data).is_err() {
                     break;
+                }
+                let elapsed = proc_start.elapsed().as_millis();
+                if elapsed < (bar_config.update * 1000.0) as u128 {
+                    thread::sleep(Duration::from_millis((bar_config.update * 1000.0) as u64) - proc_start.elapsed());
+                } else {
+                    warn!(
+                        "bar update took {}ms, exceeds configured interval of {}ms",
+                        elapsed,
+                        (bar_config.update * 1000.0) as u128
+                    )
                 }
             }
         });
@@ -489,6 +498,12 @@ impl GridWM {
                         } else {
                             0
                         });
+                    }
+                    "unfloat" => {
+                        // unfloats all windows
+                        self.floating_windows.clear();
+                        self.layout();
+                        self.draw_bar(None);
                     }
                     _ => {}
                 }
@@ -817,7 +832,6 @@ impl GridWM {
         // use toplevel window instead of child subwindow
         let win = self.get_toplevel(event.subwindow);
 
-        // TODO: remove later
         self.floating_windows.insert(win);
 
         self.layout();

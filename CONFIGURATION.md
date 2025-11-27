@@ -70,13 +70,14 @@ Keybinds for window manager actions.
 
 - **Format**: Array of arrays with two strings: `[["KEY_COMBINATION", "ACTION"], ...]`
 - **Supported modifiers**: `CTRL`, `SHIFT`, `ALT`, `SUPER` (or `WIN`, `MOD4`)
-- **Supported actions**: `close`, `desktop_right`, `desktop_left`
+- **Supported actions**: `close`, `desktop_right`, `desktop_left`, `unfloat`
   ```toml
   [keybinds]
   gridwm = [
     ["SUPER+Q", "close"],
     ["SUPER+Right", "desktop_right"],
-    ["SUPER+Left", "desktop_left"]
+    ["SUPER+Left", "desktop_left"],
+    ["SUPER+Z", "unfloat"]
   ]
   ```
 
