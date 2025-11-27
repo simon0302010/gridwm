@@ -21,11 +21,15 @@ pub struct Config {
 #[serde(default)]
 pub struct General {
     pub update_ms: u64,
+    pub scale_steps: u32,
 }
 
 impl Default for General {
     fn default() -> Self {
-        Self { update_ms: 5 }
+        Self {
+            update_ms: 5,
+            scale_steps: 20,
+        }
     }
 }
 

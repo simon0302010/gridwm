@@ -3,6 +3,7 @@ exec = []
 
 [general]
 update_ms = 5
+scale_steps = 20
 
 [keyboard]
 layout = "de"

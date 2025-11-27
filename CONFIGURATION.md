@@ -17,9 +17,11 @@ Executed programs on WM startup.
 General settings.
 
 - **`update_ms`** (integer): Run interval for main loop in milliseconds (default: `5`).
+- **`scale_steps`** (integer): Speed of window resizing (default: `20`).
   ```toml
   [general]
   update_ms = 5
+  scale_steps = 20
   ```
 
 ### `[keyboard]`

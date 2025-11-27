@@ -353,9 +353,9 @@ impl GridWM {
         }
 
         let mut event: xlib::XEvent = unsafe { zeroed() };
+        let mut too_long_count = 0;
 
         loop {
-            let is_pending = unsafe { xlib::XPending(self.display) > 0 };
             let process_start = Instant::now();
             while unsafe { xlib::XPending(self.display) } > 0 {
                 unsafe {
@@ -420,11 +420,11 @@ impl GridWM {
                                 false
                             };
 
-                            // TODO: implement window resizing with configurable speed
+                            // TODO: make resize direction configurable
                             if is_drag_bind {
                                 self.handle_drag_start(btn_event);
                             } else if is_scroll_up {
-                                info!("larger");
+                                self.scale_up(btn_event);
                             } else if is_scroll_down {
                                 self.scale_down(btn_event);
                             } else {
@@ -453,11 +453,6 @@ impl GridWM {
                 }
             }
 
-            if is_pending {
-                // uncomment to see how long each processing iteration takes
-                // debug!("processing took {} microseconds.", process_start.elapsed().as_micros())
-            }
-
             if let Ok(data) = timer_rx.try_recv()
                 && self.config.bar.enable
             {
@@ -472,9 +467,15 @@ impl GridWM {
             let sleep_time = Duration::from_millis(self.config.general.update_ms);
             let process_took = process_start.elapsed();
             if process_took < sleep_time {
+                too_long_count = 0;
                 thread::sleep(sleep_time - process_took);
             } else {
-                warn!("main loop took too long!");
+                too_long_count += 1;
+            }
+
+            // it can sometimes take too long when resizing windows fast
+            if too_long_count > 5 {
+                warn!("main loop exceeded the expected duration 5 consecutive times");
             }
         }
     }
@@ -914,18 +915,51 @@ impl GridWM {
             xlib::XRaiseWindow(self.display, win);
         }
 
-        // TODO: make configurable
-        let steps = 10;
-
         let attr = self.get_window_attributes(win);
-        let new_width = (attr.width as u32 - steps).max(100);
-        let new_height = (attr.height as u32 - steps).max(100);
+        let new_width = (attr.width as u32 - self.config.general.scale_steps).max(100);
+        let new_height = (attr.height as u32 - self.config.general.scale_steps).max(100);
 
         self.resize_window(win, new_width, new_height);
         self.move_window(
             win,
             attr.x + (attr.width - new_width as i32) / 2,
             attr.y + (attr.height - new_height as i32) / 2,
+        );
+    }
+
+    fn scale_up(&mut self, event: xlib::XButtonEvent) {
+        if event.subwindow == 0 {
+            return;
+        }
+
+        let win = self.get_toplevel(event.subwindow);
+
+        self.floating_windows.insert(win);
+
+        self.layout();
+
+        unsafe {
+            xlib::XSetInputFocus(
+                self.display,
+                win,
+                xlib::RevertToPointerRoot,
+                xlib::CurrentTime,
+            );
+            xlib::XRaiseWindow(self.display, win);
+        }
+
+        let attr = self.get_window_attributes(win);
+        // don't let the user make it too large
+        let new_width = (attr.width as u32 + self.config.general.scale_steps)
+            .min((self.screen_width as f32 * 1.5) as u32);
+        let new_height = (attr.height as u32 + self.config.general.scale_steps)
+            .min((self.screen_height as f32 * 1.5) as u32);
+
+        self.resize_window(win, new_width, new_height);
+        self.move_window(
+            win,
+            attr.x - ((new_width as i32 - attr.width) / 2),
+            attr.y - ((new_height as i32 - attr.height) / 2),
         );
     }
 
