@@ -39,7 +39,9 @@ pub struct GridWM {
     drag_state: Option<DragState>,
     floating_windows: BTreeSet<Window>,
     bar_gc: xlib::GC,
-    background_gc: xlib::GC,
+    bar_background_gc: xlib::GC,
+    win_bar_gc: xlib::GC,
+    win_bar_background_gc: xlib::GC,
     bar_str: String,
     screen_width: i16,
     screen_height: i16,
@@ -90,7 +92,8 @@ impl GridWM {
             });
         let config = Config::from_file(&config_path)?;
 
-        let (background_gc, bar_gc) = match create_gc(
+        // colors for bar
+        let (bar_background_gc, bar_gc) = match create_gc(
             display,
             config.bar.background_color.clone(),
             config.bar.text_color.clone(),
@@ -98,13 +101,30 @@ impl GridWM {
         ) {
             Some(dat) => dat,
             None => {
-                error!("failed to create bar and background gc. exiting.");
+                error!("failed to create bar and bar background gc. exiting.");
                 std::process::exit(1);
             }
         };
 
+        // get bar content
         let mut bar_str = get_widgets(&config.bar.widgets);
         bar_str = bar_str.replace("DESKTOP_HERE", &desktop_widget(current_desktop));
+
+        // colors for window top bar
+        let (win_bar_background_gc, win_bar_gc) = match create_gc(
+            display,
+            config.window.background_color.clone(),
+            config.window.text_color.clone(),
+            "window bar",
+        ) {
+            Some(dat) => dat,
+            None => {
+                error!(
+                    "failed to create window top bar and window top bar background gc. exiting."
+                );
+                std::process::exit(1);
+            }
+        };
 
         let (screen_width, screen_height) = match get_screen_size(display) {
             Ok(wh) => wh,
@@ -121,8 +141,10 @@ impl GridWM {
             current_desktop,
             drag_state: None,
             floating_windows: BTreeSet::new(),
-            background_gc,
+            bar_background_gc,
             bar_gc,
+            win_bar_background_gc,
+            win_bar_gc,
             bar_str,
             screen_width,
             screen_height,
@@ -804,7 +826,7 @@ impl GridWM {
             xlib::XFillRectangle(
                 self.display,
                 root,
-                self.background_gc,
+                self.bar_background_gc,
                 0,
                 0,
                 self.screen_width as u32,
@@ -866,27 +888,27 @@ impl GridWM {
         (0..n)
             .map(|i| {
                 let i = i as i32;
-                if self.config.bar.enable && !self.config.general.window_bars {
+                if self.config.bar.enable && !self.config.window.window_bars {
                     WindowInfo {
                         x: (i % cols) * w,
                         y: ((i / cols) * h) + self.config.bar.height as i32,
                         w,
                         h,
                     }
-                } else if self.config.bar.enable && self.config.general.window_bars {
+                } else if self.config.bar.enable && self.config.window.window_bars {
                     WindowInfo {
                         x: (i % cols) * w,
                         y: ((i / cols) * h)
                             + self.config.bar.height as i32
-                            + (((i / cols) + 1) * self.config.general.window_bar_height as i32),
+                            + (((i / cols) + 1) * self.config.window.window_bar_height as i32),
                         w,
                         h,
                     }
-                } else if !self.config.bar.enable && self.config.general.window_bars {
+                } else if !self.config.bar.enable && self.config.window.window_bars {
                     WindowInfo {
                         x: (i % cols) * w,
                         y: ((i / cols) * h)
-                            + (((i / cols) + 1) * self.config.general.window_bar_height as i32),
+                            + (((i / cols) + 1) * self.config.window.window_bar_height as i32),
                         w,
                         h,
                     }
@@ -1018,8 +1040,8 @@ impl GridWM {
         }
 
         let attr = self.get_window_attributes(win);
-        let new_width = (attr.width as u32 - self.config.general.scale_steps).max(100);
-        let new_height = (attr.height as u32 - self.config.general.scale_steps).max(100);
+        let new_width = (attr.width as u32 - self.config.window.scale_steps).max(100);
+        let new_height = (attr.height as u32 - self.config.window.scale_steps).max(100);
 
         self.resize_window(win, new_width, new_height);
         self.move_window(
@@ -1052,9 +1074,9 @@ impl GridWM {
 
         let attr = self.get_window_attributes(win);
         // don't let the user make it too large
-        let new_width = (attr.width as u32 + self.config.general.scale_steps)
+        let new_width = (attr.width as u32 + self.config.window.scale_steps)
             .min((self.screen_width as f32 * 1.5) as u32);
-        let new_height = (attr.height as u32 + self.config.general.scale_steps)
+        let new_height = (attr.height as u32 + self.config.window.scale_steps)
             .min((self.screen_height as f32 * 1.5) as u32);
 
         self.resize_window(win, new_width, new_height);

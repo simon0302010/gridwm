@@ -9,6 +9,7 @@ use crate::gridwm::error::GridWMError;
 pub struct Config {
     pub start: Start,
     pub general: General,
+    pub window: Window,
     pub keyboard: Keyboard,
     pub mouse: Mouse,
     pub desktop: Desktop,
@@ -16,24 +17,39 @@ pub struct Config {
     pub keybinds: Keybinds,
 }
 
+// window section of config
+#[derive(Debug, Deserialize)]
+#[serde(default)]
+pub struct Window {
+    pub scale_steps: u32,
+    pub window_bars: bool,
+    pub window_bar_height: u32,
+    pub text_color: String,
+    pub background_color: String,
+}
+
+impl Default for Window {
+    fn default() -> Self {
+        Self {
+            scale_steps: 20,
+            window_bars: false,
+            window_bar_height: 20,
+            text_color: "#ffffff".into(),
+            background_color: "#000000".into(),
+        }
+    }
+}
+
 // general section of config
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct General {
     pub update_ms: u64,
-    pub scale_steps: u32,
-    pub window_bars: bool,
-    pub window_bar_height: u32,
 }
 
 impl Default for General {
     fn default() -> Self {
-        Self {
-            update_ms: 5,
-            scale_steps: 20,
-            window_bars: false,
-            window_bar_height: 20,
-        }
+        Self { update_ms: 5 }
     }
 }
 
