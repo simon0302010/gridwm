@@ -7,6 +7,7 @@ pub enum GridWMError {
     DisplayNotFound(String),
     NulString(NulError),
     ScreenNotFound(String),
+    Other(String),
 }
 
 impl fmt::Display for GridWMError {
@@ -17,6 +18,7 @@ impl fmt::Display for GridWMError {
             GridWMError::ScreenNotFound(screen) => write!(f, "screen {} not found", screen),
             GridWMError::Io(err) => write!(f, "io error: {}", err),
             GridWMError::Toml(err) => write!(f, "failed to parse toml: {}", err),
+            GridWMError::Other(err) => write!(f, "{}", err),
         }
     }
 }

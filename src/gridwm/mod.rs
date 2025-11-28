@@ -503,6 +503,41 @@ impl GridWM {
         self.set_desktop(self.current_desktop, desktop);
     }
 
+    fn get_name(&self, window: Window) -> Result<String, GridWMError> {
+        let mut win_name: *mut i8 = std::ptr::null_mut();
+        let status = unsafe { xlib::XFetchName(self.display, window, &mut win_name) };
+        if status != 0 && !win_name.is_null() {
+            let win_title = unsafe {
+                std::ffi::CStr::from_ptr(win_name)
+                    .to_string_lossy()
+                    .into_owned()
+            };
+            unsafe { xlib::XFree(win_name as *mut _) };
+            Ok(win_title)
+        } else {
+            Err(GridWMError::Other(
+                "failed to fetch window name".to_string(),
+            ))
+        }
+    }
+
+    fn get_focused(&self) -> Option<Window> {
+        unsafe {
+            let mut focused: Window = std::mem::zeroed();
+            let mut revert: i32 = std::mem::zeroed();
+            xlib::XGetInputFocus(
+                self.display,
+                &mut focused as *mut Window,
+                &mut revert as *mut i32,
+            );
+            if focused == 0 || focused == xlib::PointerRoot as u64 {
+                None
+            } else {
+                Some(focused)
+            }
+        }
+    }
+
     fn remove_window(&mut self, event: xlib::XEvent) {
         let event: xlib::XUnmapEvent = From::from(event);
         let mut desktop = self.get_desktop(self.current_desktop);
