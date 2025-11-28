@@ -24,9 +24,7 @@ use std::{
 use x11::{
     xinerama,
     xlib::{
-        self, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor,
-        XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues,
-        XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes,
+        self, Atom, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues, XGetWindowProperty, XInternAtom, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
     },
 };
 
@@ -513,12 +511,43 @@ impl GridWM {
                     .into_owned()
             };
             unsafe { xlib::XFree(win_name as *mut _) };
-            Ok(win_title)
-        } else {
-            Err(GridWMError::Other(
-                "failed to fetch window name".to_string(),
-            ))
+            return Ok(win_title);
         }
+
+        // if above fails
+        unsafe {
+            let net_wm_name = XInternAtom(self.display, CString::new("_NET_WM_NAME").unwrap().as_ptr(), 0);
+            let utf8 = XInternAtom(self.display, CString::new("UTF8_STRING").unwrap().as_ptr(), 0);
+
+            let mut actual_type: Atom = std::mem::zeroed();
+            let mut actual_format: i32 = std::mem::zeroed();
+            let mut nitems: u64 = std::mem::zeroed();
+            let mut bytes_after: u64 = std::mem::zeroed();
+            let mut data: *mut u8 = std::ptr::null_mut();
+
+            if XGetWindowProperty(
+                self.display,
+                window,
+                net_wm_name,
+                0,
+                !0,
+                0,
+                utf8,
+                &mut actual_type,
+                &mut actual_format,
+                &mut nitems,
+                &mut bytes_after,
+                &mut data,
+            ) == 0 && !data.is_null() {
+                let win_title = std::ffi::CStr::from_ptr(data as *const i8)
+                    .to_string_lossy()
+                    .into_owned();
+                xlib::XFree(data as *mut _);
+                return Ok(win_title);
+            }
+        }
+
+        Err(GridWMError::Other(format!("failed to get name for window {}", window)))
     }
 
     fn get_focused(&self) -> Option<Window> {
@@ -727,7 +756,6 @@ impl GridWM {
     }
 
     // TODO: maybe move it somewhere else
-    // TODO: fix bar disappearing when window is dragged over it
     fn draw_bar(&self, content: Option<String>) {
         unsafe {
             let root = XDefaultRootWindow(self.display);
