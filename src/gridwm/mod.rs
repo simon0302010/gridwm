@@ -12,7 +12,7 @@ use signals::*;
 
 use log::*;
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeSet, HashMap, HashSet},
     ffi::CString,
     mem::zeroed,
     process::Command,
@@ -45,6 +45,7 @@ pub struct GridWM {
     bar_str: String,
     screen_width: i16,
     screen_height: i16,
+    win_bar_windows: HashMap<Window, Window>,
 }
 
 pub type Window = u64;
@@ -148,6 +149,7 @@ impl GridWM {
             bar_str,
             screen_width,
             screen_height,
+            win_bar_windows: HashMap::new(),
         })
     }
 
@@ -320,13 +322,13 @@ impl GridWM {
 
             xlib::XDefineCursor(self.display, root, cursor);
 
-            // set background yay
+            // set background
             self.set_background(self.config.desktop.color.clone());
 
-            // flush the toilet
+            // flush
             XFlush(self.display);
 
-            // draw bar for the first time yahooooo
+            // draw bar for the first time
             if self.config.bar.enable {
                 self.draw_bar(None);
             }
@@ -491,6 +493,15 @@ impl GridWM {
                 self.draw_bar(None);
             }
 
+            if self.config.window.window_bars {
+                self.draw_window_bar();
+            }
+
+            // flush
+            unsafe {
+                XFlush(self.display);
+            }
+
             // subtract time process took from sleep time
             let sleep_time = Duration::from_millis(self.config.general.update_ms);
             let process_took = process_start.elapsed();
@@ -593,7 +604,8 @@ impl GridWM {
         )))
     }
 
-    fn get_focused(&self) -> Option<Window> {
+    // may be used later on
+    fn _get_focused(&self) -> Option<Window> {
         unsafe {
             let mut focused: Window = std::mem::zeroed();
             let mut revert: i32 = std::mem::zeroed();
@@ -616,6 +628,7 @@ impl GridWM {
         desktop.remove(&event.window);
         self.set_desktop(self.current_desktop, desktop);
         self.floating_windows.remove(&event.window);
+        self.win_bar_windows.remove(&event.window);
     }
 
     fn move_window(&self, window: Window, x: i32, y: i32) {
@@ -771,12 +784,10 @@ impl GridWM {
                     xlib::CurrentTime,
                 );
                 xlib::XRaiseWindow(self.display, clicked_win);
-                XFlush(self.display);
             }
         }
         unsafe {
             xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
-            XFlush(self.display);
         }
     }
 
@@ -795,6 +806,90 @@ impl GridWM {
             }
 
             self.current_desktop = index;
+        }
+    }
+
+    fn draw_window_bar(&mut self) {
+        unsafe {
+            let desktop = self.get_desktop(self.current_desktop);
+
+            let valid_windows: HashSet<Window> = desktop.iter().copied().collect();
+            self.win_bar_windows.retain(|parent_win, bar_win| {
+                if !valid_windows.contains(parent_win) {
+                    false
+                } else {
+                    let mut attrs = std::mem::zeroed();
+                    let result = xlib::XGetWindowAttributes(self.display, *bar_win, &mut attrs);
+                    result != 0
+                }
+            });
+
+            for window in &desktop {
+                if !self.is_tileable(*window) {
+                    continue;
+                }
+
+                let attrs = self.get_window_attributes(*window);
+
+                // create or get bar window
+                let bar_window = if let Some(&bar_win) = self.win_bar_windows.get(window) {
+                    bar_win
+                } else {
+                    // create a new child window for the bar
+                    let bar_win = xlib::XCreateSimpleWindow(
+                        self.display,
+                        *window,
+                        0,
+                        -(self.config.window.window_bar_height as i32),
+                        attrs.width as u32,
+                        self.config.window.window_bar_height,
+                        0,
+                        0,
+                        0,
+                    );
+                    xlib::XMapWindow(self.display, bar_win);
+                    self.win_bar_windows.insert(*window, bar_win);
+                    bar_win
+                };
+
+                // resize bar window if parent window size changed
+                xlib::XMoveResizeWindow(
+                    self.display,
+                    bar_window,
+                    0,
+                    -(self.config.window.window_bar_height as i32),
+                    attrs.width as u32,
+                    self.config.window.window_bar_height,
+                );
+
+                let win_name = self.get_name(*window).unwrap_or_default();
+                let win_name_c = match CString::new(win_name) {
+                    Ok(name) => name,
+                    Err(_) => continue,
+                };
+
+                xlib::XFillRectangle(
+                    self.display,
+                    bar_window,
+                    self.win_bar_background_gc,
+                    0,
+                    -(self.config.window.window_bar_height as i32),
+                    attrs.width as u32,
+                    self.config.window.window_bar_height,
+                );
+
+                let text_offset = (self.config.window.window_bar_height as i32) * 3 / 4;
+
+                xlib::XDrawString(
+                    self.display,
+                    bar_window,
+                    self.win_bar_gc,
+                    5,
+                    -(self.config.window.window_bar_height as i32) + text_offset,
+                    win_name_c.as_ptr(),
+                    win_name_c.to_bytes().len() as i32,
+                );
+            }
         }
     }
 
@@ -842,8 +937,6 @@ impl GridWM {
                 bar_str.as_ptr(),
                 bar_str.to_bytes().len() as i32,
             );
-
-            XFlush(self.display);
         }
     }
 
@@ -852,7 +945,7 @@ impl GridWM {
         let tileable: Vec<Window> = desktop
             .iter()
             .copied()
-            .filter(|&w| self.is_tileable(w))
+            .filter(|&w| self.is_tileable(w) && !self.floating_windows.contains(&w))
             .collect();
 
         if tileable.is_empty() {
@@ -902,7 +995,7 @@ impl GridWM {
                             + self.config.bar.height as i32
                             + (((i / cols) + 1) * self.config.window.window_bar_height as i32),
                         w,
-                        h,
+                        h: h - self.config.window.window_bar_height as i32,
                     }
                 } else if !self.config.bar.enable && self.config.window.window_bars {
                     WindowInfo {
@@ -910,7 +1003,7 @@ impl GridWM {
                         y: ((i / cols) * h)
                             + (((i / cols) + 1) * self.config.window.window_bar_height as i32),
                         w,
-                        h,
+                        h: h - self.config.window.window_bar_height as i32,
                     }
                 } else {
                     // bar disabled and window bars disabled
@@ -926,11 +1019,12 @@ impl GridWM {
     }
 
     fn is_tileable(&self, window: Window) -> bool {
-        if self.floating_windows.contains(&window) {
-            return false;
-        }
-
         unsafe {
+            let root = XDefaultRootWindow(self.display);
+            if window == 0 || window == root {
+                return false;
+            }
+
             let window_type_c = CString::new("_NET_WM_WINDOW_TYPE").unwrap();
             let notif_c = CString::new("_NET_WM_WINDOW_TYPE_NOTIFICATION").unwrap();
             let dock_c = CString::new("_NET_WM_WINDOW_TYPE_DOCK").unwrap();
