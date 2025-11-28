@@ -22,6 +22,8 @@ pub struct Config {
 pub struct General {
     pub update_ms: u64,
     pub scale_steps: u32,
+    pub window_bars: bool,
+    pub window_bar_height: u32,
 }
 
 impl Default for General {
@@ -29,6 +31,8 @@ impl Default for General {
         Self {
             update_ms: 5,
             scale_steps: 20,
+            window_bars: false,
+            window_bar_height: 20,
         }
     }
 }

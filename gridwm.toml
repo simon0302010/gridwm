@@ -4,6 +4,8 @@ exec = []
 [general]
 update_ms = 5
 scale_steps = 20
+window_bars = true
+window_bar_height = 20
 
 [keyboard]
 layout = "de"

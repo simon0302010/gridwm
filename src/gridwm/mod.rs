@@ -24,7 +24,10 @@ use std::{
 use x11::{
     xinerama,
     xlib::{
-        self, Atom, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor, XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues, XGetWindowProperty, XInternAtom, XParseColor, XSetWindowBackground, XUnmapWindow, XWindowAttributes
+        self, Atom, Cursor, GCForeground, XAllocColor, XButtonPressedEvent, XClearWindow, XColor,
+        XCreateFontCursor, XDefaultColormap, XDefaultRootWindow, XDefaultScreen, XFlush, XGCValues,
+        XGetWindowProperty, XInternAtom, XParseColor, XSetWindowBackground, XUnmapWindow,
+        XWindowAttributes,
     },
 };
 
@@ -516,8 +519,16 @@ impl GridWM {
 
         // if above fails
         unsafe {
-            let net_wm_name = XInternAtom(self.display, CString::new("_NET_WM_NAME").unwrap().as_ptr(), 0);
-            let utf8 = XInternAtom(self.display, CString::new("UTF8_STRING").unwrap().as_ptr(), 0);
+            let net_wm_name = XInternAtom(
+                self.display,
+                CString::new("_NET_WM_NAME").unwrap().as_ptr(),
+                0,
+            );
+            let utf8 = XInternAtom(
+                self.display,
+                CString::new("UTF8_STRING").unwrap().as_ptr(),
+                0,
+            );
 
             let mut actual_type: Atom = std::mem::zeroed();
             let mut actual_format: i32 = std::mem::zeroed();
@@ -538,7 +549,9 @@ impl GridWM {
                 &mut nitems,
                 &mut bytes_after,
                 &mut data,
-            ) == 0 && !data.is_null() {
+            ) == 0
+                && !data.is_null()
+            {
                 let win_title = std::ffi::CStr::from_ptr(data as *const i8)
                     .to_string_lossy()
                     .into_owned();
@@ -547,7 +560,10 @@ impl GridWM {
             }
         }
 
-        Err(GridWMError::Other(format!("failed to get name for window {}", window)))
+        Err(GridWMError::Other(format!(
+            "failed to get name for window {}",
+            window
+        )))
     }
 
     fn get_focused(&self) -> Option<Window> {
@@ -845,14 +861,32 @@ impl GridWM {
         (0..n)
             .map(|i| {
                 let i = i as i32;
-                if self.config.bar.enable {
+                if self.config.bar.enable && !self.config.general.window_bars {
                     WindowInfo {
                         x: (i % cols) * w,
                         y: ((i / cols) * h) + self.config.bar.height as i32,
                         w,
                         h,
                     }
+                } else if self.config.bar.enable && self.config.general.window_bars {
+                    WindowInfo {
+                        x: (i % cols) * w,
+                        y: ((i / cols) * h)
+                            + self.config.bar.height as i32
+                            + (((i / cols) + 1) * self.config.general.window_bar_height as i32),
+                        w,
+                        h,
+                    }
+                } else if !self.config.bar.enable && self.config.general.window_bars {
+                    WindowInfo {
+                        x: (i % cols) * w,
+                        y: ((i / cols) * h)
+                            + (((i / cols) + 1) * self.config.general.window_bar_height as i32),
+                        w,
+                        h,
+                    }
                 } else {
+                    // bar disabled and window bars disabled
                     WindowInfo {
                         x: (i % cols) * w,
                         y: (i / cols) * h,
