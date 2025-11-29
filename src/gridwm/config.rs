@@ -27,6 +27,7 @@ pub struct Window {
     pub text_color: String,
     pub background_color: String,
     pub reverse_resize: bool,
+    pub window_margin: i32,
 }
 
 impl Default for Window {
@@ -38,6 +39,7 @@ impl Default for Window {
             text_color: "#ffffff".into(),
             background_color: "#272727".into(),
             reverse_resize: false,
+            window_margin: 0,
         }
     }
 }

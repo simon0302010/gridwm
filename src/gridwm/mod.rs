@@ -1127,10 +1127,13 @@ impl GridWM {
                 };
 
                 WindowInfo {
-                    x: (i % cols) * w,
-                    y: ((i / cols) * h) + bar_height + window_bar_height,
-                    w,
-                    h: h - window_bar_height,
+                    x: (i % cols) * w + (self.config.window.window_margin / 2),
+                    y: ((i / cols) * h)
+                        + bar_height
+                        + window_bar_height
+                        + (self.config.window.window_margin / 2),
+                    w: w - self.config.window.window_margin,
+                    h: h - window_bar_height - self.config.window.window_margin,
                 }
             })
             .collect()
