@@ -1338,6 +1338,15 @@ impl GridWM {
             );
             xlib::XRaiseWindow(self.display, win);
 
+            // also raise the window top bar
+            if let Some((_, bar_win)) = self
+                .win_bar_windows
+                .iter()
+                .find(|(main_win, _)| **main_win == win)
+            {
+                xlib::XRaiseWindow(self.display, *bar_win);
+            }
+
             // grab pointer
             let root = XDefaultRootWindow(self.display);
             xlib::XGrabPointer(
