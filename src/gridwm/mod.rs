@@ -690,7 +690,7 @@ impl GridWM {
         let mut desktop = self.get_desktop(self.current_desktop);
         desktop.remove(&event.window);
         self.set_desktop(self.current_desktop, desktop);
-        self.floating_windows.remove(&event.window);
+        // self.floating_windows.remove(&event.window);
 
         if let Some(bar_win) = self.win_bar_windows.remove(&event.window) {
             unsafe {
@@ -755,6 +755,7 @@ impl GridWM {
                             unsafe {
                                 XUnmapWindow(self.display, event.subwindow);
                             }
+                            self.floating_windows.remove(&event.subwindow);
                         }
                     }
                     "desktop_right" => {
@@ -874,6 +875,7 @@ impl GridWM {
         if index == self.current_desktop {
             return;
         }
+
         unsafe {
             let old_desktop = self.get_desktop(self.current_desktop);
 
@@ -895,6 +897,8 @@ impl GridWM {
 
             self.current_desktop = index;
         }
+
+        self.trigger_redraw = true;
     }
 
     fn draw_window_bar(&mut self) {
@@ -1388,6 +1392,14 @@ impl GridWM {
             let new_y = state.start_win_y + delta_y;
 
             self.move_window(state.window, new_x, new_y);
+
+            if let Some(&bar_win) = self.win_bar_windows.get(&state.window) {
+                self.move_window(
+                    bar_win,
+                    new_x,
+                    new_y - self.config.window.window_bar_height as i32,
+                );
+            }
         }
     }
 
