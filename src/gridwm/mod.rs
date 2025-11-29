@@ -1314,16 +1314,27 @@ impl GridWM {
             self.get_toplevel(event.subwindow)
         };
 
-        self.floating_windows.insert(win);
+        let attr = self.get_window_attributes(win);
+
+        let mut new_x = attr.x;
+        let mut new_y = attr.y;
+
+        if self.floating_windows.insert(win) {
+            let new_width = (self.screen_width as f32 * 0.5) as u32;
+            let new_height = (self.screen_height as f32 * 0.5) as u32;
+
+            new_x = event.x_root - (new_width / 2) as i32;
+            new_y = event.y_root - (new_height / 2) as i32;
+
+            self.move_resize_window(win, new_x, new_y, new_width, new_height);
+        }
 
         self.layout();
 
-        let attr = self.get_window_attributes(win);
-
         self.drag_state = Some(DragState {
             window: win,
-            start_win_x: attr.x,
-            start_win_y: attr.y,
+            start_win_x: new_x,
+            start_win_y: new_y,
             start_mouse_x: event.x_root,
             start_mouse_y: event.y_root,
         });
