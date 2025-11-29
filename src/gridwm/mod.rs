@@ -29,6 +29,7 @@ use x11::{
         XGetWindowProperty, XInternAtom, XParseColor, XSetWindowBackground, XUnmapWindow,
         XWindowAttributes,
     },
+    xrandr::{RRMode, XRRGetCrtcInfo, XRRGetScreenResources},
 };
 
 unsafe extern "C" fn x_error_handler(
@@ -53,6 +54,7 @@ pub struct GridWM {
     screen_width: i16,
     screen_height: i16,
     win_bar_windows: HashMap<Window, Window>,
+    refresh_rate: i16,
 }
 
 pub type Window = u64;
@@ -142,6 +144,38 @@ impl GridWM {
             }
         };
 
+        let refresh_rate: i16 = unsafe {
+            let root = XDefaultRootWindow(display);
+
+            let screen_resources = XRRGetScreenResources(display, root);
+            let mut active_mode_id: RRMode = 0;
+            for i in 0..(*screen_resources).ncrtc {
+                let crtc = *(*screen_resources).crtcs.offset(i as isize);
+                let crtc_info = XRRGetCrtcInfo(display, screen_resources, crtc);
+
+                if (*crtc_info).mode != 0 {
+                    active_mode_id = (*crtc_info).mode;
+                }
+            }
+
+            let mut active_rate = 0;
+            for i in 0..(*screen_resources).nmode {
+                let mode_info = (*screen_resources).modes.offset(i as isize);
+                if (*mode_info).id == active_mode_id {
+                    let total_pixels = (*mode_info).hTotal as u64 * (*mode_info).vTotal as u64;
+                    if total_pixels > 0 {
+                        active_rate = (*mode_info).dotClock / total_pixels;
+                    }
+                }
+            }
+
+            if active_rate > 0 {
+                active_rate as i16
+            } else {
+                60
+            }
+        };
+
         Ok(GridWM {
             display,
             config,
@@ -157,6 +191,7 @@ impl GridWM {
             screen_width,
             screen_height,
             win_bar_windows: HashMap::new(),
+            refresh_rate,
         })
     }
 
@@ -171,6 +206,8 @@ impl GridWM {
         unsafe {
             xlib::XSetErrorHandler(Some(x_error_handler));
         }
+
+        debug!("refresh rate: {}", self.refresh_rate);
 
         // set keyboard layout
         if !self.config.keyboard.layout.is_empty() {
@@ -201,7 +238,7 @@ impl GridWM {
                 }
             };
 
-        // asdhu9aduiahidadhnihihasdhiahdoagfilkzurl
+        // stuff
         unsafe {
             let root = XDefaultRootWindow(self.display);
 
@@ -513,8 +550,16 @@ impl GridWM {
                 XFlush(self.display);
             }
 
-            // subtract time process took from sleep time
-            let sleep_time = Duration::from_millis(self.config.general.update_ms);
+            // get time from config or calculate from refresh rate
+            let sleep_time = match self.config.general.update_ms.as_str() {
+                "auto" => Duration::from_millis((1000.0 / self.refresh_rate as f64) as u64),
+                value => Duration::from_millis(
+                    value
+                        .parse()
+                        .expect("general.update_ms is not a valid number or set to \"auto\""),
+                ),
+            };
+
             let process_took = process_start.elapsed();
             if process_took < sleep_time {
                 too_long_count = 0;

@@ -44,12 +44,14 @@ impl Default for Window {
 #[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct General {
-    pub update_ms: u64,
+    pub update_ms: String,
 }
 
 impl Default for General {
     fn default() -> Self {
-        Self { update_ms: 5 }
+        Self {
+            update_ms: "5".to_string(),
+        }
     }
 }
 
