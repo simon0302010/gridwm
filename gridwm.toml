@@ -34,11 +34,11 @@ gridwm = [
     ["SUPER+C", "close"],
     ["SUPER+RIGHT", "desktop_right"],
     ["SUPER+LEFT", "desktop_left"],
-    ["ALT+Z", "unfloat"]
+    ["SUPER+Z", "unfloat"]
 ]
 exec = [
     ["SUPER+ENTER", "konsole"],
     ["SUPER+SPACE", "rofi -show drun"]
 ]
-move_mod = "ALT"
-resize_mod = "ALT"
+move_mod = "SUPER"
+resize_mod = "SUPER"

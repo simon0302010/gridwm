@@ -1099,38 +1099,22 @@ impl GridWM {
         (0..n)
             .map(|i| {
                 let i = i as i32;
-                if self.config.bar.enable && !self.config.window.window_bars {
-                    WindowInfo {
-                        x: (i % cols) * w,
-                        y: ((i / cols) * h) + self.config.bar.height as i32,
-                        w,
-                        h,
-                    }
-                } else if self.config.bar.enable && self.config.window.window_bars {
-                    WindowInfo {
-                        x: (i % cols) * w,
-                        y: ((i / cols) * h)
-                            + self.config.bar.height as i32
-                            + (((i / cols) + 1) * self.config.window.window_bar_height as i32),
-                        w,
-                        h: h - self.config.window.window_bar_height as i32,
-                    }
-                } else if !self.config.bar.enable && self.config.window.window_bars {
-                    WindowInfo {
-                        x: (i % cols) * w,
-                        y: ((i / cols) * h)
-                            + (((i / cols) + 1) * self.config.window.window_bar_height as i32),
-                        w,
-                        h: h - self.config.window.window_bar_height as i32,
-                    }
-                } else {
-                    // bar disabled and window bars disabled
-                    WindowInfo {
-                        x: (i % cols) * w,
-                        y: (i / cols) * h,
-                        w,
-                        h,
-                    }
+
+                let bar_height = match self.config.bar.enable {
+                    true => self.config.bar.height as i32,
+                    false => 0,
+                };
+
+                let window_bar_height = match self.config.window.window_bars {
+                    true => self.config.window.window_bar_height as i32,
+                    false => 0,
+                };
+
+                WindowInfo {
+                    x: (i % cols) * w,
+                    y: ((i / cols) * h) + bar_height + window_bar_height,
+                    w,
+                    h: h - window_bar_height,
                 }
             })
             .collect()
