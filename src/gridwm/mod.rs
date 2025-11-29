@@ -31,6 +31,13 @@ use x11::{
     },
 };
 
+unsafe extern "C" fn x_error_handler(
+    _display: *mut xlib::Display,
+    _event: *mut xlib::XErrorEvent,
+) -> i32 {
+    0
+}
+
 pub struct GridWM {
     display: *mut xlib::Display,
     config: Config,
@@ -159,6 +166,10 @@ impl GridWM {
             Err(e) => {
                 println!("failed to start logger: {}", e);
             }
+        }
+
+        unsafe {
+            xlib::XSetErrorHandler(Some(x_error_handler));
         }
 
         // set keyboard layout
@@ -628,7 +639,12 @@ impl GridWM {
         desktop.remove(&event.window);
         self.set_desktop(self.current_desktop, desktop);
         self.floating_windows.remove(&event.window);
-        self.win_bar_windows.remove(&event.window);
+
+        if let Some(bar_win) = self.win_bar_windows.remove(&event.window) {
+            unsafe {
+                xlib::XDestroyWindow(self.display, bar_win);
+            }
+        }
     }
 
     fn move_window(&self, window: Window, x: i32, y: i32) {
@@ -784,6 +800,9 @@ impl GridWM {
                     xlib::CurrentTime,
                 );
                 xlib::XRaiseWindow(self.display, clicked_win);
+                if let Some(&bar_win) = self.win_bar_windows.get(&clicked_win) {
+                    xlib::XRaiseWindow(self.display, bar_win);
+                }
             }
         }
         unsafe {
@@ -796,10 +815,19 @@ impl GridWM {
             return;
         }
         unsafe {
-            for window in self.get_desktop(self.current_desktop) {
+            let old_desktop = self.get_desktop(self.current_desktop);
+
+            for window in &old_desktop {
+                if let Some(bar_win) = self.win_bar_windows.remove(window) {
+                    xlib::XDestroyWindow(self.display, bar_win);
+                }
+            }
+
+            for window in old_desktop {
                 xlib::XUnmapWindow(self.display, window);
                 xlib::XUnmapSubwindows(self.display, window);
             }
+
             for window in self.get_desktop(index) {
                 xlib::XMapWindow(self.display, window);
                 xlib::XMapSubwindows(self.display, window);
@@ -816,6 +844,7 @@ impl GridWM {
             let valid_windows: HashSet<Window> = desktop.iter().copied().collect();
             self.win_bar_windows.retain(|parent_win, bar_win| {
                 if !valid_windows.contains(parent_win) {
+                    xlib::XDestroyWindow(self.display, *bar_win);
                     false
                 } else {
                     let mut attrs = std::mem::zeroed();
@@ -825,22 +854,37 @@ impl GridWM {
             });
 
             for window in &desktop {
+                if self
+                    .win_bar_windows
+                    .values()
+                    .any(|&bar_win| bar_win == *window)
+                {
+                    continue;
+                }
+
+                let mut check_attrs: XWindowAttributes = std::mem::zeroed();
+                if xlib::XGetWindowAttributes(self.display, *window, &mut check_attrs) == 0 {
+                    continue;
+                }
+
                 if !self.is_tileable(*window) {
                     continue;
                 }
 
                 let attrs = self.get_window_attributes(*window);
+                let root = XDefaultRootWindow(self.display);
 
                 // create or get bar window
-                let bar_window = if let Some(&bar_win) = self.win_bar_windows.get(window) {
-                    bar_win
+                let (bar_window, is_new) = if let Some(&bar_win) = self.win_bar_windows.get(window)
+                {
+                    (bar_win, false)
                 } else {
-                    // create a new child window for the bar
+                    // create a new window for the bar
                     let bar_win = xlib::XCreateSimpleWindow(
                         self.display,
-                        *window,
-                        0,
-                        -(self.config.window.window_bar_height as i32),
+                        root,
+                        attrs.x,
+                        attrs.y - (self.config.window.window_bar_height as i32),
                         attrs.width as u32,
                         self.config.window.window_bar_height,
                         0,
@@ -849,18 +893,22 @@ impl GridWM {
                     );
                     xlib::XMapWindow(self.display, bar_win);
                     self.win_bar_windows.insert(*window, bar_win);
-                    bar_win
+                    (bar_win, true)
                 };
 
                 // resize bar window if parent window size changed
                 xlib::XMoveResizeWindow(
                     self.display,
                     bar_window,
-                    0,
-                    -(self.config.window.window_bar_height as i32),
+                    attrs.x,
+                    attrs.y - (self.config.window.window_bar_height as i32),
                     attrs.width as u32,
                     self.config.window.window_bar_height,
                 );
+
+                if is_new {
+                    xlib::XRaiseWindow(self.display, bar_window);
+                }
 
                 let win_name = self.get_name(*window).unwrap_or_default();
                 let win_name_c = match CString::new(win_name) {
@@ -873,7 +921,7 @@ impl GridWM {
                     bar_window,
                     self.win_bar_background_gc,
                     0,
-                    -(self.config.window.window_bar_height as i32),
+                    0,
                     attrs.width as u32,
                     self.config.window.window_bar_height,
                 );
@@ -885,7 +933,7 @@ impl GridWM {
                     bar_window,
                     self.win_bar_gc,
                     5,
-                    -(self.config.window.window_bar_height as i32) + text_offset,
+                    text_offset,
                     win_name_c.as_ptr(),
                     win_name_c.to_bytes().len() as i32,
                 );
@@ -945,7 +993,14 @@ impl GridWM {
         let tileable: Vec<Window> = desktop
             .iter()
             .copied()
-            .filter(|&w| self.is_tileable(w) && !self.floating_windows.contains(&w))
+            .filter(|&w| {
+                if !self.is_tileable(w) || self.floating_windows.contains(&w) {
+                    return false;
+                }
+                // check if still exists
+                let mut attrs: XWindowAttributes = unsafe { std::mem::zeroed() };
+                unsafe { xlib::XGetWindowAttributes(self.display, w, &mut attrs) != 0 }
+            })
             .collect();
 
         if tileable.is_empty() {
@@ -1183,11 +1238,22 @@ impl GridWM {
 
     fn handle_drag_start(&mut self, event: xlib::XButtonEvent) {
         if event.subwindow == 0 {
+            // allow events
+            unsafe {
+                xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
+            }
             return;
         }
 
-        // use toplevel window instead of child subwindow
-        let win = self.get_toplevel(event.subwindow);
+        let win = if let Some((&parent_win, _)) = self
+            .win_bar_windows
+            .iter()
+            .find(|(_, bar_win)| **bar_win == event.subwindow)
+        {
+            parent_win
+        } else {
+            self.get_toplevel(event.subwindow)
+        };
 
         self.floating_windows.insert(win);
 
