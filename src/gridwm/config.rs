@@ -35,7 +35,7 @@ impl Default for Window {
             window_bars: false,
             window_bar_height: 20,
             text_color: "#ffffff".into(),
-            background_color: "#000000".into(),
+            background_color: "#272727".into(),
         }
     }
 }

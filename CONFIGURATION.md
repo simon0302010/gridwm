@@ -16,12 +16,27 @@ Executed programs on WM startup.
 ### `[general]`
 General settings.
 
-- **`update_ms`** (integer): Run interval for main loop in milliseconds (default: `5`).
-- **`scale_steps`** (integer): Speed of window resizing (default: `20`).
+- **`update_ms`** (integer as string): Run interval for main loop in milliseconds (default: `"5"`). Uses screen refresh rate if set to `"auto"`.
   ```toml
   [general]
-  update_ms = 5
+  update_ms = "5"
+  ```
+
+### `[window]`
+Window settings.
+
+- **`scale_steps`** (integer): Speed of window resizing (default: `20`).
+- **`window_bars`** (boolean): Show title bars on windows. Is performance intensive and can still contain bugs (default: `false`).
+- **`window_bar_height`** (integer): Height of the window title bars in pixels (default: `20`).
+- **`text_color`** (string): Text color of the window title bars in hex format (e.g., `"#ffffff"`).
+- **`background_color`** (string): Background color of the window title bars in hex format (e.g., `"#272727"`).
+  ```toml
+  [window]
   scale_steps = 20
+  window_bars = false
+  window_bar_height = 20
+  text_color = "#ffffff"
+  background_color = "#272727"
   ```
 
 ### `[keyboard]`
@@ -30,7 +45,7 @@ Keyboard settings.
 - **`layout`** (string): Keyboard layout (e.g., `"us"`, `"de"`, `"fr"`). Empty string means no layout change.
   ```toml
   [keyboard]
-  layout = "us"
+  layout = "de"
   ```
 
 ### `[mouse]`
@@ -121,6 +136,16 @@ Other keybinds.
 ```toml
 [start]
 exec = ["firefox"]
+
+[general]
+update_ms = "auto"
+
+[window]
+scale_steps = 20
+window_bars = false
+window_bar_height = 20
+text_color = "#ffffff"
+background_color = "#272727"
 
 [keyboard]
 layout = "de"
