@@ -55,6 +55,7 @@ pub struct GridWM {
     screen_height: i16,
     win_bar_windows: HashMap<Window, Window>,
     refresh_rate: i16,
+    trigger_redraw: bool,
 }
 
 pub type Window = u64;
@@ -192,6 +193,7 @@ impl GridWM {
             screen_height,
             win_bar_windows: HashMap::new(),
             refresh_rate,
+            trigger_redraw: true,
         })
     }
 
@@ -533,17 +535,22 @@ impl GridWM {
 
             if let Ok(data) = timer_rx.try_recv()
                 && self.config.bar.enable
+                && data != self.bar_str
             {
                 self.bar_str = data;
+                self.trigger_redraw = true;
             }
 
-            if self.config.bar.enable {
+            if self.config.bar.enable && self.trigger_redraw {
                 self.draw_bar(None);
             }
 
-            if self.config.window.window_bars {
+            if self.config.window.window_bars && self.trigger_redraw {
                 self.draw_window_bar();
             }
+
+            // reset
+            self.trigger_redraw = false;
 
             // flush
             unsafe {
@@ -692,12 +699,19 @@ impl GridWM {
         }
     }
 
-    fn move_window(&self, window: Window, x: i32, y: i32) {
+    fn move_window(&mut self, window: Window, x: i32, y: i32) {
         unsafe { xlib::XMoveWindow(self.display, window, x, y) };
+        self.trigger_redraw = true;
     }
 
-    fn resize_window(&self, window: Window, width: u32, height: u32) {
+    fn resize_window(&mut self, window: Window, width: u32, height: u32) {
         unsafe { xlib::XResizeWindow(self.display, window, width, height) };
+        self.trigger_redraw = true;
+    }
+
+    fn move_resize_window(&mut self, window: Window, x: i32, y: i32, width: u32, height: u32) {
+        unsafe { xlib::XMoveResizeWindow(self.display, window, x, y, width, height) };
+        self.trigger_redraw = true;
     }
 
     fn get_window_attributes(&self, window: Window) -> XWindowAttributes {
@@ -826,7 +840,7 @@ impl GridWM {
         }
     }
 
-    fn handle_button(&self, event: xlib::XEvent) {
+    fn handle_button(&mut self, event: xlib::XEvent) {
         let event: XButtonPressedEvent = From::from(event);
 
         // get toplevel window if child was clicked
@@ -849,6 +863,7 @@ impl GridWM {
                     xlib::XRaiseWindow(self.display, bar_win);
                 }
             }
+            self.trigger_redraw = true;
         }
         unsafe {
             xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
@@ -942,8 +957,7 @@ impl GridWM {
                 };
 
                 // resize bar window if parent window size changed
-                xlib::XMoveResizeWindow(
-                    self.display,
+                self.move_resize_window(
                     bar_window,
                     attrs.x,
                     attrs.y - (self.config.window.window_bar_height as i32),
@@ -1033,7 +1047,7 @@ impl GridWM {
         }
     }
 
-    fn layout(&self) {
+    fn layout(&mut self) {
         let desktop = self.get_desktop(self.current_desktop);
         let tileable: Vec<Window> = desktop
             .iter()
@@ -1340,6 +1354,8 @@ impl GridWM {
 
             // replay pointer
             xlib::XAllowEvents(self.display, xlib::ReplayPointer, xlib::CurrentTime);
+
+            self.trigger_redraw = true;
         }
     }
 
@@ -1362,6 +1378,8 @@ impl GridWM {
             xlib::XAllowEvents(self.display, xlib::AsyncPointer, xlib::CurrentTime);
         }
         self.drag_state = None;
+
+        self.trigger_redraw = true;
     }
 }
 

@@ -2,7 +2,7 @@
 exec = []
 
 [general]
-update_ms = 5
+update_ms = "auto"
 
 [window]
 scale_steps = 20
