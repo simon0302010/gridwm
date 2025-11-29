@@ -1,1 +1,0 @@
-- Window title changes do not trigger a bar refresh, leaving them unupdated until the next general bar update.

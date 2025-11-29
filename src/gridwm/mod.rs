@@ -852,13 +852,22 @@ impl GridWM {
         let event: XButtonPressedEvent = From::from(event);
 
         // get toplevel window if child was clicked
-        let clicked_win = if event.subwindow != 0 {
+        let mut clicked_win = if event.subwindow != 0 {
             self.get_toplevel(event.subwindow)
         } else {
             event.subwindow
         };
 
         if clicked_win != 0 {
+            // also make it work if clicked on top window bar
+            if let Some((&parent_win, _)) = self
+                .win_bar_windows
+                .iter()
+                .find(|(_, bar_win)| **bar_win == clicked_win)
+            {
+                clicked_win = parent_win;
+            }
+
             unsafe {
                 xlib::XSetInputFocus(
                     self.display,
