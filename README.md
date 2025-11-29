@@ -32,13 +32,13 @@ https://github.com/user-attachments/assets/cb0c99de-f742-4768-86b3-7a5043a1eec7
    Debian based systems:
 
    ```bash
-   sudo apt install xserver-xorg xinit x11-xserver-utils x11-xkb-utils xorg pkg-config libx11-dev libxinerama-dev
+   sudo apt install xserver-xorg xinit x11-xserver-utils x11-xkb-utils xorg pkg-config libx11-dev libxinerama-dev libxrandr-dev
    ```
 
    Arch based systems:
 
    ```bash
-   sudo pacman -S xorg-server xorg-xinit xorg-setxkbmap xorg-xsetroot
+   sudo pacman -S xorg-server xorg-xinit xorg-setxkbmap xorg-xsetroot libxrandr
    ```
 
 2. Install Binary
