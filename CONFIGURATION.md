@@ -30,6 +30,7 @@ Window settings.
 - **`window_bar_height`** (integer): Height of the window title bars in pixels (default: `20`).
 - **`text_color`** (string): Text color of the window title bars in hex format (e.g., `"#ffffff"`).
 - **`background_color`** (string): Background color of the window title bars in hex format (e.g., `"#272727"`).
+- **`reverse_resize`** (boolean): Reverse the direction of window resizing (default: `false`).
   ```toml
   [window]
   scale_steps = 20
@@ -37,6 +38,7 @@ Window settings.
   window_bar_height = 20
   text_color = "#ffffff"
   background_color = "#272727"
+  reverse_resize = false
   ```
 
 ### `[keyboard]`

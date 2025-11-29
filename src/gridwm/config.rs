@@ -26,6 +26,7 @@ pub struct Window {
     pub window_bar_height: u32,
     pub text_color: String,
     pub background_color: String,
+    pub reverse_resize: bool,
 }
 
 impl Default for Window {
@@ -36,6 +37,7 @@ impl Default for Window {
             window_bar_height: 20,
             text_color: "#ffffff".into(),
             background_color: "#272727".into(),
+            reverse_resize: false,
         }
     }
 }

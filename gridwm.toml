@@ -8,6 +8,7 @@ update_ms = "auto"
 scale_steps = 20
 window_bars = true
 window_bar_height = 20
+reverse_resize = true
 
 [keyboard]
 layout = "de"

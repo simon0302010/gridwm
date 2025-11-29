@@ -500,13 +500,20 @@ impl GridWM {
                                 false
                             };
 
-                            // TODO: make resize direction configurable
                             if is_drag_bind {
                                 self.handle_drag_start(btn_event);
                             } else if is_scroll_up {
-                                self.scale_up(btn_event);
+                                if !self.config.window.reverse_resize {
+                                    self.scale_up(btn_event);
+                                } else {
+                                    self.scale_down(btn_event);
+                                }
                             } else if is_scroll_down {
-                                self.scale_down(btn_event);
+                                if !self.config.window.reverse_resize {
+                                    self.scale_down(btn_event);
+                                } else {
+                                    self.scale_up(btn_event);
+                                }
                             } else {
                                 self.handle_button(event);
                             }
