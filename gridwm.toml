@@ -3,14 +3,14 @@ exec = []
 
 [general]
 update_ms = "auto"
-snowflakes = false
+snowflakes = true
 
 [window]
 scale_steps = 20
 window_bars = true
 window_bar_height = 20
 reverse_resize = true
-window_margin = 14
+window_margin = 8
 
 [keyboard]
 layout = "de"
@@ -30,7 +30,7 @@ background_color = "#000000"
 height = 20
 enable = true
 update = 3.0
-widgets = ["desktop", "time", "battery", "cpu", "mem"] # desktop, time, cpu, mem, battery
+widgets = ["desktop", "time", "cpu", "mem"] # desktop, time, cpu, mem, battery
 
 [keybinds]
 gridwm = [
