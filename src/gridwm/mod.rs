@@ -3,12 +3,14 @@ mod config;
 mod error;
 mod keybinds;
 mod signals;
+mod winter;
 
 use bar::*;
 use config::Config;
 use error::*;
 use keybinds::*;
 use signals::*;
+use winter::*;
 
 use log::*;
 use std::{
@@ -56,6 +58,7 @@ pub struct GridWM {
     win_bar_windows: HashMap<Window, Window>,
     refresh_rate: i16,
     trigger_redraw: bool,
+    snowflakes: Vec<Snowflake>,
 }
 
 pub type Window = u64;
@@ -177,6 +180,12 @@ impl GridWM {
             }
         };
 
+        let mut snowflakes: Vec<Snowflake> = Vec::new();
+
+        if config.general.snowflakes {
+            snowflakes = generate_snowflakes(screen_width, screen_height);
+        }
+
         Ok(GridWM {
             display,
             config,
@@ -194,6 +203,7 @@ impl GridWM {
             win_bar_windows: HashMap::new(),
             refresh_rate,
             trigger_redraw: true,
+            snowflakes,
         })
     }
 
@@ -545,6 +555,18 @@ impl GridWM {
                 && data != self.bar_str
             {
                 self.bar_str = data;
+                self.trigger_redraw = true;
+            }
+
+            // snowflakes
+            if self.config.general.snowflakes {
+                draw_snowflakes(
+                    self.display,
+                    &mut self.snowflakes,
+                    self.screen_width,
+                    self.screen_height,
+                    self.bar_gc,
+                );
                 self.trigger_redraw = true;
             }
 
@@ -1046,7 +1068,15 @@ impl GridWM {
                 }
             };
 
-            xlib::XClearArea(self.display, root, 0, 0, self.screen_width as u32, 50, 0);
+            xlib::XClearArea(
+                self.display,
+                root,
+                0,
+                0,
+                self.screen_width as u32,
+                self.config.bar.height,
+                0,
+            );
             xlib::XFillRectangle(
                 self.display,
                 root,

@@ -49,12 +49,14 @@ impl Default for Window {
 #[serde(default)]
 pub struct General {
     pub update_ms: String,
+    pub snowflakes: bool,
 }
 
 impl Default for General {
     fn default() -> Self {
         Self {
-            update_ms: "5".to_string(),
+            update_ms: "auto".to_string(),
+            snowflakes: false,
         }
     }
 }

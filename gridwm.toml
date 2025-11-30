@@ -3,6 +3,7 @@ exec = []
 
 [general]
 update_ms = "auto"
+snowflakes = false
 
 [window]
 scale_steps = 20
