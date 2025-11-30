@@ -704,6 +704,8 @@ impl GridWM {
                 xlib::XDestroyWindow(self.display, bar_win);
             }
         }
+
+        self.trigger_redraw = true;
     }
 
     fn move_window(&mut self, window: Window, x: i32, y: i32) {

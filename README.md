@@ -22,6 +22,8 @@ https://github.com/user-attachments/assets/cb0c99de-f742-4768-86b3-7a5043a1eec7
 
 ## Todo
 
+- Display popups properly
+- Configurable text size
 - Add support for notifications
 - Add support for multi-monitor setups
 
